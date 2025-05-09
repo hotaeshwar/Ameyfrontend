@@ -9,7 +9,7 @@ const Dashboard = () => {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token')
-        const response = await fetch('http://localhost:8000/profit-loss/current-month', {
+        const response = await fetch('https://api.ameyaaccountsonline.info/profit-loss/current-month', {
           headers: { 'Authorization': `Bearer ${token}` }
         })
 

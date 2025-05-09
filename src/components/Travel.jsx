@@ -51,7 +51,7 @@ const Travel = () => {
   const fetchTravels = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/travel/my', {
+      const response = await fetch('https://api.ameyaaccountsonline.info/travel/my', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -73,7 +73,7 @@ const Travel = () => {
 
   const fetchStates = async () => {
     try {
-      const response = await fetch('http://localhost:8000/locations/states');
+      const response = await fetch('https://api.ameyaaccountsonline.info/locations/states');
       if (!response.ok) {
         throw new Error('Failed to fetch states');
       }
@@ -87,7 +87,7 @@ const Travel = () => {
 
   const fetchCities = async (state) => {
     try {
-      const response = await fetch(`http://localhost:8000/locations/cities/${encodeURIComponent(state)}`);
+      const response = await fetch(`https://api.ameyaaccountsonline.info/locations/cities/${encodeURIComponent(state)}`);
       if (!response.ok) {
         throw new Error('Failed to fetch cities');
       }
@@ -102,7 +102,7 @@ const Travel = () => {
   const fetchLocations = async (state, city) => {
     try {
       const response = await fetch(
-        `http://localhost:8000/locations/locations/${encodeURIComponent(state)}/${encodeURIComponent(city)}`
+        `https://api.ameyaaccountsonline.info/locations/locations/${encodeURIComponent(state)}/${encodeURIComponent(city)}`
       );
       if (!response.ok) {
         throw new Error('Failed to fetch locations');
@@ -167,7 +167,7 @@ const Travel = () => {
         formDataToSend.append('ticket_scan', ticketFile);
       }
 
-      const response = await fetch('http://localhost:8000/travel', {
+      const response = await fetch('https://api.ameyaaccountsonline.info/travel', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -244,7 +244,7 @@ const Travel = () => {
   const viewTicket = async (travelId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/travel/ticket/${travelId}`, {
+      const response = await fetch(`https://api.ameyaaccountsonline.info/ticket/${travelId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

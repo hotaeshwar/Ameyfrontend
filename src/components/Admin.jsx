@@ -50,10 +50,10 @@ const Admin = () => {
       const token = localStorage.getItem('token')
       
       let endpoint = ''
-      if (activeTab === 'users') endpoint = 'http://localhost:8000/users/all'
-      else if (activeTab === 'expenses') endpoint = 'http://localhost:8000/expenses/all'
-      else if (activeTab === 'travel') endpoint = 'http://localhost:8000/travel/all'
-      else if (activeTab === 'reports') endpoint = 'http://localhost:8000/daily-reports/all'
+      if (activeTab === 'users') endpoint = 'https://api.ameyaaccountsonline.info/users/all'
+      else if (activeTab === 'expenses') endpoint = 'https://api.ameyaaccountsonline.info/expenses/all'
+      else if (activeTab === 'travel') endpoint = 'https://api.ameyaaccountsonline.info/travel/all'
+      else if (activeTab === 'reports') endpoint = 'https://api.ameyaaccountsonline.info/daily-reports/all'
   
       const response = await fetch(endpoint, {
         headers: { 
@@ -111,8 +111,8 @@ const Admin = () => {
       const token = localStorage.getItem('token')
       
       const endpoint = type === 'travel' 
-        ? `http://localhost:8000/travel/update-status/${id}`
-        : `http://localhost:8000/daily-report/update-status/${id}`
+        ? `https://api.ameyaaccountsonline.info/travel/update-status/${id}`
+        : `https://api.ameyaaccountsonline.info/daily-report/update-status/${id}`
 
       const formData = new FormData()
       formData.append('status', status)
@@ -171,7 +171,7 @@ const Admin = () => {
       const year = currentDate.getFullYear()
       const month = currentDate.getMonth() + 1
 
-      const response = await fetch(`http://localhost:8000/export/${type}/${year}/${month}`, {
+      const response = await fetch(`https://api.ameyaaccountsonline.info/export/${type}/${year}/${month}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
 
@@ -208,7 +208,7 @@ const Admin = () => {
       const year = currentDate.getFullYear()
       const month = currentDate.getMonth() + 1
 
-      const response = await fetch(`http://localhost:8000/archive/${year}/${month}`, {
+      const response = await fetch(`https://api.ameyaaccountsonline.info/archive/${year}/${month}`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,

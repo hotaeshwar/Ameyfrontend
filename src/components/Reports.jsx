@@ -48,7 +48,7 @@ const Reports = () => {
   const fetchReports = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:8000/daily-reports/my', {
+      const response = await fetch('https://api.ameyaaccountsonline.info/daily-reports/my', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -69,7 +69,7 @@ const Reports = () => {
 
   const fetchStates = async () => {
     try {
-      const response = await fetch('http://localhost:8000/locations/states')
+      const response = await fetch('https://api.ameyaaccountsonline.info/locations/states')
       if (!response.ok) {
         throw new Error('Failed to fetch states')
       }
@@ -82,7 +82,7 @@ const Reports = () => {
 
   const fetchCities = async (state) => {
     try {
-      const response = await fetch(`http://localhost:8000/locations/cities/${state}`)
+      const response = await fetch(`https://api.ameyaaccountsonline.info/locations/cities/${state}`)
       if (!response.ok) {
         throw new Error('Failed to fetch cities')
       }
@@ -95,7 +95,7 @@ const Reports = () => {
 
   const fetchLocations = async (state, city) => {
     try {
-      const response = await fetch(`http://localhost:8000/locations/locations/${state}/${city}`)
+      const response = await fetch(`https://api.ameyaaccountsonline.info/locations/locations/${state}/${city}`)
       if (!response.ok) {
         throw new Error('Failed to fetch locations')
       }
@@ -111,7 +111,7 @@ const Reports = () => {
     setSubmitting(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:8000/daily-reports', {
+      const response = await fetch('https://api.ameyaaccountsonline.info/daily-reports', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
