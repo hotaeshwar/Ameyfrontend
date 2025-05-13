@@ -17,7 +17,8 @@ import {
   faSpinner,
   faInfoCircle,
   faCalendarAlt,
-  faFilter
+  faFilter,
+  faUser
 } from '@fortawesome/free-solid-svg-icons'
 
 const Admin = () => {
@@ -88,7 +89,7 @@ const Admin = () => {
     }
   }
 
-  // PART 1: Filter for recent entries
+  // Filter for recent entries
   const getFilteredData = () => {
     if (!recentOnly) return data
     
@@ -256,7 +257,7 @@ const Admin = () => {
     return { status, statusClass }
   }
 
-  // PART 2: Enhanced responsive table with recent entries filtering
+  // Enhanced responsive table with user information clearly displayed
   const renderTable = () => {
     if (loading) {
       return (
@@ -337,8 +338,8 @@ const Admin = () => {
                   <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Invoice</th>
                   <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Amount</th>
                   <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Category</th>
-                  <th className="hidden sm:table-cell px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">User</th>
-                  <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Date</th>
+                  <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">User</th>
+                  <th className="hidden sm:table-cell px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Date</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -357,11 +358,14 @@ const Admin = () => {
                         {expense.category}
                       </span>
                     </td>
-                    <td className="hidden sm:table-cell px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap text-sm">
-                      <span className="font-medium">{expense.username}</span>
-                      <span className="ml-1 text-xs text-gray-500">({expense.role})</span>
+                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap text-sm">
+                      <span className="inline-flex items-center">
+                        <FontAwesomeIcon icon={faUser} className="mr-1 text-indigo-500" />
+                        <span className="font-medium">{expense.username}</span>
+                        <span className="ml-1 text-xs text-gray-500">({expense.role})</span>
+                      </span>
                     </td>
-                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="hidden sm:table-cell px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(expense.date_created).toLocaleDateString()}
                     </td>
                   </tr>
@@ -381,7 +385,7 @@ const Admin = () => {
                   <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Travel ID</th>
                   <th className="hidden sm:table-cell px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Mode</th>
                   <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Amount</th>
-                  <th className="hidden md:table-cell px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">User</th>
+                  <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">User</th>
                   <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Status</th>
                   <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Actions</th>
                 </tr>
@@ -405,9 +409,12 @@ const Admin = () => {
                       <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap">
                         <span className="font-medium text-green-600">₹{travel.calculated_amount}</span>
                       </td>
-                      <td className="hidden md:table-cell px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap text-sm">
-                        <span className="font-medium">{travel.username}</span>
-                        <span className="ml-1 text-xs text-gray-500">({travel.role})</span>
+                      <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap text-sm">
+                        <span className="inline-flex items-center">
+                          <FontAwesomeIcon icon={faUser} className="mr-1 text-indigo-500" />
+                          <span className="font-medium">{travel.username}</span>
+                          <span className="ml-1 text-xs text-gray-500">({travel.role})</span>
+                        </span>
                       </td>
                       <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap">
                         <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
@@ -469,7 +476,7 @@ const Admin = () => {
                   <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Report ID</th>
                   <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Dealer</th>
                   <th className="hidden md:table-cell px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Location</th>
-                  <th className="hidden lg:table-cell px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">User</th>
+                  <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">User</th>
                   <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Status</th>
                   <th className="px-2 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Actions</th>
                 </tr>
@@ -493,9 +500,12 @@ const Admin = () => {
                         <span className="text-gray-500">, {report.city}</span>
                         <span className="text-gray-400 hidden lg:inline">, {report.state}</span>
                       </td>
-                      <td className="hidden lg:table-cell px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap text-sm">
-                        <span className="font-medium">{report.username}</span>
-                        <span className="ml-1 text-xs text-gray-500">({report.role})</span>
+                      <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap text-sm">
+                        <span className="inline-flex items-center">
+                          <FontAwesomeIcon icon={faUser} className="mr-1 text-indigo-500" />
+                          <span className="font-medium">{report.username}</span>
+                          <span className="ml-1 text-xs text-gray-500">({report.role})</span>
+                        </span>
                       </td>
                       <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap">
                         <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
@@ -573,7 +583,7 @@ const Admin = () => {
     return null
   }
 
-  // PART 3: Enhanced responsive layout for main dashboard
+  // Enhanced responsive layout for main dashboard
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50">
       <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
