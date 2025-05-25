@@ -7,6 +7,7 @@ import Expenses from './components/Expenses'
 import Travel from './components/Travel'
 import Reports from './components/Reports'
 import Admin from './components/Admin'
+import IncomeManagement from './components/IncomeManagement'
 import Login from './components/Login'
 import Register from './components/Register'
 
@@ -16,31 +17,36 @@ function App() {
   const [loading, setLoading] = useState(true)
   
   useEffect(() => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('access_token') // Updated to match your API
+    const userRole = localStorage.getItem('user_role')
+    
     if (token) {
       try {
         const payload = JSON.parse(atob(token.split('.')[1]))
         setUser({
           username: payload.sub,
-          role: payload.role || 'user' // Default to 'user' if role not specified
+          role: userRole || payload.role || 'guest' // Use stored role or token role
         })
         setIsLoggedIn(true)
       } catch (error) {
         console.error('Token invalid:', error)
-        localStorage.removeItem('token')
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('user_role')
       }
     }
     setLoading(false)
   }, [])
   
   const handleLogin = (token, username, role) => {
-    localStorage.setItem('token', token)
-    setUser({ username, role: role || 'user' })
+    localStorage.setItem('access_token', token) // Updated to match your API
+    localStorage.setItem('user_role', role)
+    setUser({ username, role: role || 'guest' })
     setIsLoggedIn(true)
   }
   
   const handleLogout = () => {
-    localStorage.removeItem('token')
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('user_role')
     setUser(null)
     setIsLoggedIn(false)
   }
@@ -51,8 +57,11 @@ function App() {
   
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
       </div>
     )
   }
@@ -76,6 +85,7 @@ function App() {
                 <Route path="/expenses" element={<Expenses />} />
                 <Route path="/travel" element={<Travel />} />
                 <Route path="/reports" element={<Reports />} />
+                <Route path="/income" element={<IncomeManagement />} />
                 <Route 
                   path="/admin" 
                   element={

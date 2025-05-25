@@ -21,7 +21,7 @@ const Register = ({ onRegister }) => {
   useEffect(() => {
     const checkAdminExists = async () => {
       try {
-        const response = await fetch('https://api.ameyaaccountsonline.info/register', {
+        const response = await fetch('http://localhost:8000/register', {
           method: 'GET'
         })
         const data = await response.json()
@@ -39,7 +39,7 @@ const Register = ({ onRegister }) => {
     setError('')
 
     try {
-      const response = await fetch('https://api.ameyaaccountsonline.info/register', {
+      const response = await fetch('http://localhost:8000/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

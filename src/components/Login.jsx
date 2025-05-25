@@ -64,7 +64,7 @@ const Login = ({ onLogin }) => {
     setError('')
 
     try {
-      const response = await fetch('https://api.ameyaaccountsonline.info/login', {
+      const response = await fetch('http://localhost:8000/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, role }),
@@ -120,7 +120,7 @@ const Login = ({ onLogin }) => {
     setError('')
 
     try {
-      const response = await fetch('https://api.ameyaaccountsonline.info/password/reset-request', {
+      const response = await fetch('http://localhost:8000/password/reset-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: resetEmail }),
@@ -157,7 +157,7 @@ const Login = ({ onLogin }) => {
     setError('')
 
     try {
-      const response = await fetch('https://api.ameyaaccountsonline.info/password/reset-verify', {
+      const response = await fetch('http://localhost:8000/password/reset-verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

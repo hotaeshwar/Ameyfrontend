@@ -9,7 +9,8 @@ import {
   faUserCog, 
   faBars, 
   faChevronRight,
-  faChevronLeft
+  faChevronLeft,
+  faDollarSign
 } from '@fortawesome/free-solid-svg-icons'
 
 const Sidebar = ({ role }) => {
@@ -70,6 +71,7 @@ const Sidebar = ({ role }) => {
     { name: 'Expenses', path: '/expenses', icon: faReceipt },
     { name: 'Travel', path: '/travel', icon: faRoute },
     { name: 'Daily Reports', path: '/reports', icon: faClipboardList },
+    { name: 'Income & Profit', path: '/income', icon: faDollarSign }
   ]
 
   const adminMenuItem = { name: 'Admin Panel', path: '/admin', icon: faUserCog }
@@ -137,7 +139,9 @@ const Sidebar = ({ role }) => {
               className={({ isActive }) => `
                 flex items-center px-4 py-4 my-2 rounded-xl
                 ${isActive 
-                  ? 'bg-gradient-to-r from-blue-600 via-purple-500 to-indigo-600 text-white shadow-md' 
+                  ? item.name === 'Income & Profit'
+                    ? 'bg-gradient-to-r from-green-600 via-emerald-500 to-green-600 text-white shadow-md'
+                    : 'bg-gradient-to-r from-blue-600 via-purple-500 to-indigo-600 text-white shadow-md'
                   : 'hover:bg-indigo-800/50 text-gray-200'} 
                 transition-all duration-200 relative overflow-hidden group
               `}
@@ -145,7 +149,9 @@ const Sidebar = ({ role }) => {
               <div className="min-w-[32px] flex justify-center">
                 <FontAwesomeIcon 
                   icon={item.icon} 
-                  className={`text-lg transition-all duration-300 group-hover:scale-110 ${expanded ? '' : 'text-xl'}`}
+                  className={`text-lg transition-all duration-300 group-hover:scale-110 ${expanded ? '' : 'text-xl'} ${
+                    item.name === 'Income & Profit' ? 'text-green-300' : ''
+                  }`}
                 />
               </div>
               <span className={`transition-all duration-300 font-medium 
@@ -154,8 +160,16 @@ const Sidebar = ({ role }) => {
                 {item.name}
               </span>
               
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-              <span className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-blue-400 to-purple-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
+              <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none ${
+                item.name === 'Income & Profit' 
+                  ? 'bg-gradient-to-r from-green-500/10 to-emerald-500/10'
+                  : 'bg-gradient-to-r from-blue-500/10 to-purple-500/10'
+              }`} />
+              <span className={`absolute bottom-0 left-0 w-full h-0.5 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ${
+                item.name === 'Income & Profit'
+                  ? 'bg-gradient-to-r from-green-400 to-emerald-400'
+                  : 'bg-gradient-to-r from-blue-400 to-purple-400'
+              }`} />
             </NavLink>
           ))}
           
