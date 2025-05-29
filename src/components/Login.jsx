@@ -11,26 +11,25 @@ import {
 const Login = ({ onLogin }) => {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState('user')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showReset, setShowReset] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [resetCode, setResetCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('') // Added confirm password
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [resetStep, setResetStep] = useState(1)
   const [success, setSuccess] = useState('')
   const navigate = useNavigate()
   
   const [showPassword, setShowPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false) // Added confirm password visibility
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [formErrors, setFormErrors] = useState({})
 
   // Password validation
   const validatePassword = (password) => {
-    return password.length >= 6; // Changed to match backend requirement
+    return password.length >= 6;
   }
 
   // Form validation
@@ -45,10 +44,6 @@ const Login = ({ onLogin }) => {
       errors.password = 'Password is required'
     } else if (!validatePassword(password)) {
       errors.password = 'Password must be at least 6 characters'
-    }
-    
-    if (!['user', 'admin'].includes(role)) {
-      errors.role = 'Please select a valid role'
     }
     
     setFormErrors(errors)
@@ -66,22 +61,53 @@ const Login = ({ onLogin }) => {
     setError('')
 
     try {
+      console.log('Attempting login with:', { username, password: '***' });
+      
       const response = await fetch('https://api.ameyaaccountsonline.info/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, role }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ 
+          username: username.trim(), 
+          password: password 
+        }),
       })
 
+      console.log('Response status:', response.status);
+      
+      const data = await response.json()
+      console.log('Response data:', data);
+
       if (!response.ok) {
-        const data = await response.json()
+        throw new Error(data.message || `Login failed with status ${response.status}`)
+      }
+
+      if (!data.success) {
         throw new Error(data.message || 'Login failed')
       }
 
-      const data = await response.json()
-      onLogin(data.data.access_token, username, role)
+      if (!data.data || !data.data.access_token) {
+        throw new Error('Invalid response format - missing access token')
+      }
+
+      // Get the user role from the response
+      const userRole = data.data.user_role || 'guest'
+      
+      console.log('Login successful:', { 
+        token: data.data.access_token ? 'present' : 'missing',
+        role: userRole,
+        username: username
+      });
+
+      // Call the onLogin callback with the token and user info
+      onLogin(data.data.access_token, username, userRole)
       navigate('/')
+      
     } catch (err) {
-      setError(err.message)
+      console.error('Login error:', err);
+      setError(err.message || 'An unexpected error occurred')
     } finally {
       setLoading(false)
     }
@@ -117,7 +143,6 @@ const Login = ({ onLogin }) => {
     return Object.keys(errors).length === 0
   }
 
-  // Updated to match your backend API endpoints
   const handleResetRequest = async (e) => {
     e.preventDefault()
     
@@ -131,16 +156,19 @@ const Login = ({ onLogin }) => {
     try {
       const response = await fetch('https://api.ameyaaccountsonline.info/password-reset-request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: resetEmail }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ username: resetEmail.trim() }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const data = await response.json()
         throw new Error(data.message || 'Reset request failed')
       }
 
-      const data = await response.json()
       if (data.reset_token) {
         setResetCode(data.reset_token)
         setResetStep(2)
@@ -149,13 +177,13 @@ const Login = ({ onLogin }) => {
         throw new Error('No reset token received')
       }
     } catch (err) {
-      setError(err.message)
+      console.error('Reset request error:', err);
+      setError(err.message || 'Reset request failed')
     } finally {
       setLoading(false)
     }
   }
 
-  // Updated to match your backend API endpoints
   const handleResetVerify = async (e) => {
     e.preventDefault()
     
@@ -169,7 +197,10 @@ const Login = ({ onLogin }) => {
     try {
       const response = await fetch('https://api.ameyaaccountsonline.info/reset-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           token: resetCode,
           new_password: newPassword,
@@ -177,8 +208,9 @@ const Login = ({ onLogin }) => {
         }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const data = await response.json()
         throw new Error(data.message || 'Password reset failed')
       }
 
@@ -195,10 +227,23 @@ const Login = ({ onLogin }) => {
         setFormErrors({})
       }, 2000)
     } catch (err) {
-      setError(err.message)
+      console.error('Password reset error:', err);
+      setError(err.message || 'Password reset failed')
     } finally {
       setLoading(false)
     }
+  }
+
+  const resetForm = () => {
+    setShowReset(false)
+    setResetStep(1)
+    setResetEmail('')
+    setResetCode('')
+    setNewPassword('')
+    setConfirmPassword('')
+    setSuccess('')
+    setError('')
+    setFormErrors({})
   }
 
   return (
@@ -243,18 +288,15 @@ const Login = ({ onLogin }) => {
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors duration-200">
                       <FontAwesomeIcon icon={faUser} />
                     </span>
-                    <div className="relative">
-                      <input
-                        id="resetEmail"
-                        type="text"
-                        required
-                        value={resetEmail}
-                        onChange={(e) => setResetEmail(e.target.value)}
-                        className={`w-full pl-10 pr-4 py-3 border-2 ${formErrors.resetEmail ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300`}
-                        placeholder="Enter your username"
-                      />
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 hidden sm:block">Account username</div>
-                    </div>
+                    <input
+                      id="resetEmail"
+                      type="text"
+                      required
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      className={`w-full pl-10 pr-4 py-3 border-2 ${formErrors.resetEmail ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300`}
+                      placeholder="Enter your username"
+                    />
                   </div>
                   {formErrors.resetEmail && <p className="mt-1 text-sm text-red-600">{formErrors.resetEmail}</p>}
                 </div>
@@ -276,13 +318,7 @@ const Login = ({ onLogin }) => {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setShowReset(false);
-                  setResetEmail('');
-                  setError('');
-                  setSuccess('');
-                  setFormErrors({});
-                }}
+                onClick={resetForm}
                 className="w-full px-4 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transform transition-all duration-300 hover:scale-105 flex justify-center items-center"
               >
                 <FontAwesomeIcon icon={faArrowLeft} className="mr-2" /> Back to Login
@@ -320,18 +356,15 @@ const Login = ({ onLogin }) => {
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors duration-200">
                       <FontAwesomeIcon icon={faLock} />
                     </span>
-                    <div className="relative">
-                      <input
-                        id="newPassword"
-                        type={showNewPassword ? "text" : "password"}
-                        required
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className={`w-full pl-10 pr-12 py-3 border-2 ${formErrors.newPassword ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300`}
-                        placeholder="Enter your new password"
-                      />
-                      <div className="absolute right-12 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 hidden sm:block">6+ chars</div>
-                    </div>
+                    <input
+                      id="newPassword"
+                      type={showNewPassword ? "text" : "password"}
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className={`w-full pl-10 pr-12 py-3 border-2 ${formErrors.newPassword ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300`}
+                      placeholder="Enter your new password"
+                    />
                     <button
                       type="button"
                       className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-blue-600 focus:outline-none transition-colors duration-200"
@@ -351,18 +384,15 @@ const Login = ({ onLogin }) => {
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors duration-200">
                       <FontAwesomeIcon icon={faLock} />
                     </span>
-                    <div className="relative">
-                      <input
-                        id="confirmPassword"
-                        type={showConfirmPassword ? "text" : "password"}
-                        required
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className={`w-full pl-10 pr-12 py-3 border-2 ${formErrors.confirmPassword ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300`}
-                        placeholder="Confirm your new password"
-                      />
-                      <div className="absolute right-12 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 hidden sm:block">Match above</div>
-                    </div>
+                    <input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className={`w-full pl-10 pr-12 py-3 border-2 ${formErrors.confirmPassword ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300`}
+                      placeholder="Confirm your new password"
+                    />
                     <button
                       type="button"
                       className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-blue-600 focus:outline-none transition-colors duration-200"
@@ -455,18 +485,15 @@ const Login = ({ onLogin }) => {
                   <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors duration-200">
                     <FontAwesomeIcon icon={faLock} />
                   </span>
-                  <div className="relative">
-                    <input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)} 
-                      className={`w-full pl-10 pr-12 py-3 border-2 ${formErrors.password ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300`}
-                      placeholder="Enter your password"
-                    />
-                    <div className="absolute right-12 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 hidden sm:block">6+ chars</div>
-                  </div>
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)} 
+                    className={`w-full pl-10 pr-12 py-3 border-2 ${formErrors.password ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300`}
+                    placeholder="Enter your password"
+                  />
                   <button
                     type="button"
                     className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-blue-600 focus:outline-none transition-colors duration-200"
@@ -476,35 +503,6 @@ const Login = ({ onLogin }) => {
                   </button>
                 </div>
                 {formErrors.password && <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>}
-              </div>
-              <div>
-                <label htmlFor="role" className="block text-sm font-medium text-gray-700 flex items-center mb-2">
-                  <span className="mr-2"><FontAwesomeIcon icon={faUserTie} /></span>
-                  Role
-                </label>
-                <div className="relative group">
-                  <div className="relative">
-                    <select
-                      id="role"
-                      value={role}
-                      onChange={(e) => setRole(e.target.value)}
-                      className={`w-full pl-10 pr-10 py-3 border-2 ${formErrors.role ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300 appearance-none`}
-                    >
-                      <option value="user">User</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                    <div className="absolute right-10 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 hidden sm:block">Select access</div>
-                  </div>
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors duration-200">
-                    <FontAwesomeIcon icon={faUserTie} />
-                  </span>
-                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
-                    <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </span>
-                </div>
-                {formErrors.role && <p className="mt-1 text-sm text-red-600">{formErrors.role}</p>}
               </div>
             </div>
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -568,15 +566,6 @@ const Login = ({ onLogin }) => {
         }
         .bg-pattern {
           background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.2'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-        }
-        
-        @media (max-width: 640px) {
-          .from-blue-600 {
-            --tw-gradient-from: #3182ce;
-          }
-          .to-purple-700 {
-            --tw-gradient-to: #6b46c1;
-          }
         }
       `}</style>
     </div>
