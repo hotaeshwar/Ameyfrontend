@@ -18,17 +18,19 @@ const Login = ({ onLogin }) => {
   const [resetEmail, setResetEmail] = useState('')
   const [resetCode, setResetCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('') // Added confirm password
   const [resetStep, setResetStep] = useState(1)
   const [success, setSuccess] = useState('')
   const navigate = useNavigate()
   
   const [showPassword, setShowPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false) // Added confirm password visibility
   const [formErrors, setFormErrors] = useState({})
 
   // Password validation
   const validatePassword = (password) => {
-    return password.length >= 8;
+    return password.length >= 6; // Changed to match backend requirement
   }
 
   // Form validation
@@ -42,7 +44,7 @@ const Login = ({ onLogin }) => {
     if (!password) {
       errors.password = 'Password is required'
     } else if (!validatePassword(password)) {
-      errors.password = 'Password must be at least 8 characters'
+      errors.password = 'Password must be at least 6 characters'
     }
     
     if (!['user', 'admin'].includes(role)) {
@@ -102,13 +104,20 @@ const Login = ({ onLogin }) => {
     if (!newPassword) {
       errors.newPassword = 'New password is required'
     } else if (!validatePassword(newPassword)) {
-      errors.newPassword = 'Password must be at least 8 characters'
+      errors.newPassword = 'Password must be at least 6 characters'
+    }
+    
+    if (!confirmPassword) {
+      errors.confirmPassword = 'Please confirm your password'
+    } else if (newPassword !== confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match'
     }
     
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
 
+  // Updated to match your backend API endpoints
   const handleResetRequest = async (e) => {
     e.preventDefault()
     
@@ -120,7 +129,7 @@ const Login = ({ onLogin }) => {
     setError('')
 
     try {
-      const response = await fetch('https://api.ameyaaccountsonline.info/password/reset-request', {
+      const response = await fetch('https://api.ameyaaccountsonline.info/password-reset-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: resetEmail }),
@@ -132,12 +141,12 @@ const Login = ({ onLogin }) => {
       }
 
       const data = await response.json()
-      if (data.data && data.data.reset_code) {
-        setResetCode(data.data.reset_code)
+      if (data.reset_token) {
+        setResetCode(data.reset_token)
         setResetStep(2)
-        setSuccess('Reset code received successfully')
+        setSuccess('Reset token received successfully')
       } else {
-        throw new Error('No reset code received')
+        throw new Error('No reset token received')
       }
     } catch (err) {
       setError(err.message)
@@ -146,6 +155,7 @@ const Login = ({ onLogin }) => {
     }
   }
 
+  // Updated to match your backend API endpoints
   const handleResetVerify = async (e) => {
     e.preventDefault()
     
@@ -157,13 +167,13 @@ const Login = ({ onLogin }) => {
     setError('')
 
     try {
-      const response = await fetch('https://api.ameyaaccountsonline.info/password/reset-verify', {
+      const response = await fetch('https://api.ameyaaccountsonline.info/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: resetEmail,
-          reset_code: resetCode,
-          new_password: newPassword
+          token: resetCode,
+          new_password: newPassword,
+          confirm_password: confirmPassword
         }),
       })
 
@@ -176,7 +186,13 @@ const Login = ({ onLogin }) => {
       setTimeout(() => {
         setShowReset(false)
         setResetStep(1)
+        setResetEmail('')
+        setResetCode('')
+        setNewPassword('')
+        setConfirmPassword('')
         setSuccess('')
+        setError('')
+        setFormErrors({})
       }, 2000)
     } catch (err) {
       setError(err.message)
@@ -196,7 +212,9 @@ const Login = ({ onLogin }) => {
               <FontAwesomeIcon icon={faKey} className="text-2xl" />
             </span>
             <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">Password Reset</h2>
-            <p className="mt-2 text-gray-600 text-sm">Enter your account username to reset your password</p>
+            <p className="mt-2 text-gray-600 text-sm">
+              {resetStep === 1 ? 'Enter your account username to reset your password' : 'Enter your new password details'}
+            </p>
           </div>
           
           {error && (
@@ -260,6 +278,9 @@ const Login = ({ onLogin }) => {
                 type="button"
                 onClick={() => {
                   setShowReset(false);
+                  setResetEmail('');
+                  setError('');
+                  setSuccess('');
                   setFormErrors({});
                 }}
                 className="w-full px-4 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transform transition-all duration-300 hover:scale-105 flex justify-center items-center"
@@ -273,7 +294,7 @@ const Login = ({ onLogin }) => {
                 <div>
                   <label htmlFor="resetCode" className="block text-sm font-medium text-gray-700 flex items-center mb-2">
                     <span className="mr-2"><FontAwesomeIcon icon={faShieldAlt} /></span>
-                    Reset Code
+                    Reset Token
                   </label>
                   <div className="relative group">
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors duration-200">
@@ -286,7 +307,7 @@ const Login = ({ onLogin }) => {
                       value={resetCode}
                       disabled={true}
                       className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300 bg-gray-100"
-                      placeholder="Reset code auto-filled"
+                      placeholder="Reset token auto-filled"
                     />
                   </div>
                 </div>
@@ -309,7 +330,7 @@ const Login = ({ onLogin }) => {
                         className={`w-full pl-10 pr-12 py-3 border-2 ${formErrors.newPassword ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300`}
                         placeholder="Enter your new password"
                       />
-                      <div className="absolute right-12 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 hidden sm:block">Strong password</div>
+                      <div className="absolute right-12 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 hidden sm:block">6+ chars</div>
                     </div>
                     <button
                       type="button"
@@ -320,6 +341,37 @@ const Login = ({ onLogin }) => {
                     </button>
                   </div>
                   {formErrors.newPassword && <p className="mt-1 text-sm text-red-600">{formErrors.newPassword}</p>}
+                </div>
+                <div>
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 flex items-center mb-2">
+                    <span className="mr-2"><FontAwesomeIcon icon={faLock} /></span>
+                    Confirm Password
+                  </label>
+                  <div className="relative group">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors duration-200">
+                      <FontAwesomeIcon icon={faLock} />
+                    </span>
+                    <div className="relative">
+                      <input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? "text" : "password"}
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className={`w-full pl-10 pr-12 py-3 border-2 ${formErrors.confirmPassword ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300`}
+                        placeholder="Confirm your new password"
+                      />
+                      <div className="absolute right-12 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 hidden sm:block">Match above</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-blue-600 focus:outline-none transition-colors duration-200"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      <FontAwesomeIcon icon={showConfirmPassword ? faEyeSlash : faEye} className="transform transition-transform duration-300 hover:scale-110" />
+                    </button>
+                  </div>
+                  {formErrors.confirmPassword && <p className="mt-1 text-sm text-red-600">{formErrors.confirmPassword}</p>}
                 </div>
               </div>
               <button
@@ -341,6 +393,10 @@ const Login = ({ onLogin }) => {
                 type="button"
                 onClick={() => {
                   setResetStep(1);
+                  setNewPassword('');
+                  setConfirmPassword('');
+                  setError('');
+                  setSuccess('');
                   setFormErrors({});
                 }}
                 className="w-full px-4 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transform transition-all duration-300 hover:scale-105 flex justify-center items-center"
@@ -409,7 +465,7 @@ const Login = ({ onLogin }) => {
                       className={`w-full pl-10 pr-12 py-3 border-2 ${formErrors.password ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 group-hover:border-blue-300`}
                       placeholder="Enter your password"
                     />
-                    <div className="absolute right-12 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 hidden sm:block">8+ chars</div>
+                    <div className="absolute right-12 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 hidden sm:block">6+ chars</div>
                   </div>
                   <button
                     type="button"
@@ -467,6 +523,8 @@ const Login = ({ onLogin }) => {
                 type="button"
                 onClick={() => {
                   setShowReset(true);
+                  setError('');
+                  setSuccess('');
                   setFormErrors({});
                 }}
                 className="text-sm font-medium text-blue-600 hover:text-blue-500 hover:underline transition-all duration-200"
