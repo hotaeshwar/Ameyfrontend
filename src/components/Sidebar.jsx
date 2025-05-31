@@ -71,7 +71,8 @@ const Sidebar = ({ role }) => {
     { name: 'Expenses', path: '/expenses', icon: faReceipt },
     { name: 'Travel', path: '/travel', icon: faRoute },
     { name: 'Daily Reports', path: '/reports', icon: faClipboardList },
-    { name: 'Income & Profit', path: '/income', icon: faDollarSign }
+    // Income & Profit tab is now conditionally included based on role
+    ...(role === 'admin' ? [{ name: 'Income & Profit', path: '/income', icon: faDollarSign }] : [])
   ]
 
   const adminMenuItem = { name: 'Admin Panel', path: '/admin', icon: faUserCog }
