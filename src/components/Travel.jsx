@@ -50,14 +50,26 @@ const Travel = () => {
 
   const fetchTravels = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token');
+      
+      console.log('Token found for fetchTravels:', token ? 'Yes' : 'No'); // Debug log
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.');
+      }
+
       const response = await fetch('https://api.ameyaaccountsonline.info/travel/my', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear();
+          throw new Error('Session expired. Please login again.');
+        }
         throw new Error('Failed to fetch travel records');
       }
 
@@ -122,7 +134,15 @@ const Travel = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
+      // FIXED: Use correct token key that matches App.js
+      const token = localStorage.getItem('access_token');
+      
+      console.log('Token found for handleSubmit:', token ? 'Yes' : 'No'); // Debug log
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.');
+      }
+
       const isPublicTransport = ['Bus', 'Train', 'Flight'].includes(formData.travel_mode);
       
       // Validation for public transport
@@ -176,6 +196,10 @@ const Travel = () => {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear();
+          throw new Error('Session expired. Please login again.');
+        }
         const errorData = await response.json();
         throw new Error(errorData.detail || errorData.message || 'Failed to add travel record');
       }
@@ -243,14 +267,27 @@ const Travel = () => {
   
   const viewTicket = async (travelId) => {
     try {
-      const token = localStorage.getItem('token');
+      // FIXED: Use correct token key that matches App.js
+      const token = localStorage.getItem('access_token');
+      
+      console.log('Token found for viewTicket:', token ? 'Yes' : 'No'); // Debug log
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.');
+      }
+
       const response = await fetch(`https://api.ameyaaccountsonline.info/ticket/${travelId}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
   
       if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear();
+          throw new Error('Session expired. Please login again.');
+        }
         throw new Error('Failed to fetch ticket');
       }
   
@@ -819,8 +856,9 @@ const Travel = () => {
           </div>
         </div>
 
-        {/* Travel History Section */}
+        {/* Travel History Section - Rest of the component remains the same as original */}
         <div className={`lg:col-span-2 order-2 lg:order-1 ${activeTab === 'history' ? 'block' : 'hidden md:block'}`}>
+          {/* All the existing history section code remains unchanged */}
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-indigo-100 transform transition-all hover:shadow-2xl">
             <div className="p-5 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white flex items-center justify-between">
               <h3 className="text-xl font-bold flex items-center">
