@@ -20,7 +20,7 @@ const Expenses = () => {
     try {
       setLoading(true)
       setError('')
-      const token = localStorage.getItem('token')
+      const token = localStorage.getItem('access_token')
       
       const response = await fetch('https://api.ameyaaccountsonline.info/expenses/my', {
         headers: {
@@ -66,7 +66,7 @@ const Expenses = () => {
     try {
       setLoading(true)
       setError('')
-      const token = localStorage.getItem('token')
+      const token = localStorage.getItem('access_token')
       
       const response = await fetch('https://api.ameyaaccountsonline.info/expenses', {
         method: 'POST',
