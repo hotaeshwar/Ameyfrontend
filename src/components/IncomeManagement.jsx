@@ -23,6 +23,9 @@ const IncomeManagement = () => {
     const token = localStorage.getItem('access_token');
     const role = localStorage.getItem('user_role') || 'guest';
     setUserRole(role);
+    
+    console.log('Income Management - Token found:', token ? 'Yes' : 'No'); // Debug log
+    console.log('Income Management - User role:', role); // Debug log
   }, []);
 
   // API Base URL
@@ -31,6 +34,11 @@ const IncomeManagement = () => {
   // Helper function to get auth headers
   const getAuthHeaders = () => {
     const token = localStorage.getItem('access_token');
+    
+    if (!token) {
+      throw new Error('No authentication token found. Please login again.');
+    }
+    
     return {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
@@ -43,9 +51,29 @@ const IncomeManagement = () => {
     
     setLoading(true);
     try {
+      const headers = getAuthHeaders();
+      console.log('Fetching income data with headers:', headers); // Debug log
+      
       const response = await fetch(`${API_BASE}/income/all`, {
-        headers: getAuthHeaders()
+        headers
       });
+      
+      console.log('Income data response status:', response.status); // Debug log
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear();
+          throw new Error('Session expired. Please login again.');
+        }
+        if (response.status === 404) {
+          // Endpoint doesn't exist - this is normal, just show empty state
+          setIncomeData([]);
+          setIncomeStats(null);
+          return;
+        }
+        throw new Error(`Failed to fetch income data (${response.status})`);
+      }
+      
       const data = await response.json();
       
       if (data.success) {
@@ -55,7 +83,12 @@ const IncomeManagement = () => {
         setError(data.message || 'Failed to fetch income data');
       }
     } catch (err) {
-      setError('Network error occurred');
+      console.error('Error fetching income data:', err);
+      if (err.message.includes('login')) {
+        setError(err.message);
+      } else {
+        setError('Income data not available');
+      }
     } finally {
       setLoading(false);
     }
@@ -102,20 +135,45 @@ const IncomeManagement = () => {
   const fetchIncomeStats = async () => {
     setLoading(true);
     try {
+      const headers = getAuthHeaders();
+      console.log('Fetching income stats with headers:', headers); // Debug log
+      
       const response = await fetch(`${API_BASE}/income/stats`, {
-        headers: getAuthHeaders()
+        headers
       });
+      
+      console.log('Income stats response status:', response.status); // Debug log
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear();
+          throw new Error('Session expired. Please login again.');
+        }
+        if (response.status === 404) {
+          // Stats endpoint doesn't exist, try to fetch income data instead
+          console.log('Stats endpoint not found, fetching income data instead');
+          fetchIncomeData();
+          return;
+        }
+        throw new Error(`Failed to fetch income stats (${response.status})`);
+      }
+      
       const data = await response.json();
       
       if (data.success) {
         setIncomeStats(data.data);
       } else {
-        // If stats endpoint doesn't exist, calculate from income data
+        // If stats endpoint doesn't work properly, calculate from income data
         fetchIncomeData();
       }
     } catch (err) {
-      // Fallback to fetching income data
-      fetchIncomeData();
+      console.error('Error fetching income stats:', err);
+      if (err.message.includes('login')) {
+        setError(err.message);
+      } else {
+        // Fallback to fetching income data
+        fetchIncomeData();
+      }
     } finally {
       setLoading(false);
     }
@@ -135,15 +193,32 @@ const IncomeManagement = () => {
 
     setLoading(true);
     try {
+      const headers = getAuthHeaders();
+      console.log('Creating income record with headers:', headers); // Debug log
+      
       const response = await fetch(`${API_BASE}/income`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers,
         body: JSON.stringify({
           description: formData.description,
           amount: parseFloat(formData.amount),
           category: formData.category || formData.description.split(' ')[0]
         })
       });
+      
+      console.log('Create income response status:', response.status); // Debug log
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear();
+          throw new Error('Session expired. Please login again.');
+        }
+        if (response.status === 404) {
+          throw new Error('Income creation endpoint not found. This feature may not be implemented yet.');
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to create income record (${response.status})`);
+      }
       
       const data = await response.json();
       
@@ -156,7 +231,8 @@ const IncomeManagement = () => {
         setError(data.message || 'Failed to create income record');
       }
     } catch (err) {
-      setError('Network error occurred');
+      console.error('Error creating income record:', err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -164,9 +240,11 @@ const IncomeManagement = () => {
 
   // Load data on component mount and tab change
   useEffect(() => {
-    fetchIncomeStats();
-    if (userRole === 'admin') {
-      fetchIncomeData();
+    if (userRole !== 'guest') {
+      fetchIncomeStats();
+      if (userRole === 'admin') {
+        fetchIncomeData();
+      }
     }
   }, [userRole]);
 
@@ -374,6 +452,19 @@ const IncomeManagement = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* No Data State */}
+            {!incomeStats && !loading && (
+              <div className="text-center py-12">
+                <DollarSign className="mx-auto w-16 h-16 text-gray-400 mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Income Data Available</h3>
+                <p className="text-gray-600">
+                  {userRole === 'admin' 
+                    ? 'Start by adding your first income record or check if the income endpoints are properly configured.' 
+                    : 'Income data is not available at this time.'}
+                </p>
               </div>
             )}
           </div>
