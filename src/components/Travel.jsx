@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const Travel = () => {
   const [travels, setTravels] = useState([]);
@@ -8,7 +8,12 @@ const Travel = () => {
   const [cities, setCities] = useState([]);
   const [locations, setLocations] = useState([]);
   const [ticketFile, setTicketFile] = useState(null);
-  const [activeTab, setActiveTab] = useState('history'); // 'history' or 'add'
+  const [activeTab, setActiveTab] = useState('history');
+  const [showKeyboard, setShowKeyboard] = useState(false);
+  const [keyboardType, setKeyboardType] = useState('text'); // 'text' or 'number'
+  const [activeInput, setActiveInput] = useState(null);
+  const inputRef = useRef(null);
+  
   const [formData, setFormData] = useState({
     distance_km: '',
     travel_mode: 'Two Wheeler',
@@ -20,9 +25,180 @@ const Travel = () => {
     to_station: ''
   });
 
+  // Virtual Keyboard Component
+  const VirtualKeyboard = () => {
+    const [isShiftPressed, setIsShiftPressed] = useState(false);
+    const [isCapsLock, setIsCapsLock] = useState(false);
+    
+    const numberKeys = [
+      ['1', '2', '3'],
+      ['4', '5', '6'],
+      ['7', '8', '9'],
+      ['.', '0', '⌫']
+    ];
+    
+    const textKeys = [
+      ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
+      ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
+      ['shift', 'z', 'x', 'c', 'v', 'b', 'n', 'm', '⌫'],
+      ['123', 'space', '↵']
+    ];
+
+    const handleKeyPress = (key) => {
+      if (!activeInput) return;
+
+      const currentValue = formData[activeInput] || '';
+      
+      if (key === '⌫') {
+        // Backspace
+        const newValue = currentValue.slice(0, -1);
+        setFormData(prev => ({ ...prev, [activeInput]: newValue }));
+      } else if (key === 'space') {
+        // Space
+        const newValue = currentValue + ' ';
+        setFormData(prev => ({ ...prev, [activeInput]: newValue }));
+      } else if (key === 'shift') {
+        // Shift toggle
+        setIsShiftPressed(!isShiftPressed);
+      } else if (key === '123') {
+        // Switch to number keyboard
+        setKeyboardType('number');
+      } else if (key === 'ABC') {
+        // Switch to text keyboard
+        setKeyboardType('text');
+      } else if (key === '↵') {
+        // Enter - close keyboard
+        closeKeyboard();
+      } else if (key === 'caps') {
+        // Caps lock
+        setIsCapsLock(!isCapsLock);
+      } else {
+        // Regular key
+        let keyToAdd = key;
+        if (keyboardType === 'text' && (isShiftPressed || isCapsLock)) {
+          keyToAdd = key.toUpperCase();
+        }
+        
+        const newValue = currentValue + keyToAdd;
+        setFormData(prev => ({ ...prev, [activeInput]: newValue }));
+        
+        // Reset shift after use
+        if (isShiftPressed) {
+          setIsShiftPressed(false);
+        }
+      }
+    };
+
+    const closeKeyboard = () => {
+      setShowKeyboard(false);
+      setActiveInput(null);
+      if (inputRef.current) {
+        inputRef.current.blur();
+      }
+    };
+
+    if (!showKeyboard) return null;
+
+    return (
+      <div className="fixed inset-x-0 bottom-0 bg-gray-100 border-t-2 border-gray-300 z-50 p-2 shadow-2xl">
+        <div className="flex justify-between items-center mb-2 px-2">
+          <span className="text-sm font-medium text-gray-600">
+            {activeInput?.replace('_', ' ').toUpperCase()}
+          </span>
+          <button
+            onClick={closeKeyboard}
+            className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
+          >
+            ✕ Close
+          </button>
+        </div>
+        
+        {keyboardType === 'number' ? (
+          <div className="space-y-1">
+            {numberKeys.map((row, rowIndex) => (
+              <div key={rowIndex} className="flex justify-center space-x-1">
+                {row.map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => handleKeyPress(key)}
+                    className={`px-4 py-3 rounded text-lg font-semibold transition-colors ${
+                      key === '⌫' 
+                        ? 'bg-red-500 text-white hover:bg-red-600' 
+                        : 'bg-white text-gray-800 hover:bg-gray-200 border border-gray-300'
+                    }`}
+                  >
+                    {key}
+                  </button>
+                ))}
+              </div>
+            ))}
+            <div className="flex justify-center mt-2">
+              <button
+                onClick={() => setKeyboardType('text')}
+                className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600"
+              >
+                ABC
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {textKeys.map((row, rowIndex) => (
+              <div key={rowIndex} className="flex justify-center space-x-1">
+                {row.map((key) => {
+                  let buttonClass = "px-2 py-3 rounded text-sm font-semibold transition-colors ";
+                  let displayKey = key;
+                  
+                  if (key === 'shift') {
+                    buttonClass += isShiftPressed 
+                      ? 'bg-blue-500 text-white' 
+                      : 'bg-gray-500 text-white hover:bg-gray-600';
+                    displayKey = '⇧';
+                  } else if (key === 'space') {
+                    buttonClass += 'bg-gray-300 text-gray-800 hover:bg-gray-400 px-20';
+                    displayKey = 'Space';
+                  } else if (key === '⌫') {
+                    buttonClass += 'bg-red-500 text-white hover:bg-red-600';
+                  } else if (key === '123') {
+                    buttonClass += 'bg-blue-500 text-white hover:bg-blue-600';
+                  } else if (key === '↵') {
+                    buttonClass += 'bg-green-500 text-white hover:bg-green-600';
+                    displayKey = 'Enter';
+                  } else {
+                    buttonClass += 'bg-white text-gray-800 hover:bg-gray-200 border border-gray-300';
+                    if (isShiftPressed || isCapsLock) {
+                      displayKey = key.toUpperCase();
+                    }
+                  }
+                  
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => handleKeyPress(key)}
+                      className={buttonClass}
+                    >
+                      {displayKey}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const openKeyboard = (inputName, type = 'text') => {
+    setActiveInput(inputName);
+    setKeyboardType(type);
+    setShowKeyboard(true);
+  };
+
   useEffect(() => {
     fetchTravels();
     fetchStates();
+    
     // Add FontAwesome script dynamically
     const script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js';
@@ -33,17 +209,37 @@ const Travel = () => {
     const handleResize = () => {
       if (window.innerWidth < 768) {
         setActiveTab('history');
+        // Close keyboard on resize
+        if (showKeyboard) {
+          setShowKeyboard(false);
+          setActiveInput(null);
+        }
       }
     };
     
-    // Set initial state
     handleResize();
-    
-    // Add event listener
     window.addEventListener('resize', handleResize);
     
+    // Add mobile input styles
+    const style = document.createElement('style');
+    style.textContent = `
+      @media (max-width: 768px) {
+        input, select, textarea {
+          font-size: 16px !important;
+          -webkit-appearance: none;
+          appearance: none;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    
     return () => {
-      document.body.removeChild(script);
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+      if (document.head.contains(style)) {
+        document.head.removeChild(style);
+      }
       window.removeEventListener('resize', handleResize);
     };
   }, []);
@@ -51,8 +247,6 @@ const Travel = () => {
   const fetchTravels = async () => {
     try {
       const token = localStorage.getItem('access_token');
-      
-      console.log('Token found for fetchTravels:', token ? 'Yes' : 'No'); // Debug log
       
       if (!token) {
         throw new Error('No authentication token found. Please login again.');
@@ -67,7 +261,6 @@ const Travel = () => {
 
       if (!response.ok) {
         if (response.status === 401) {
-          localStorage.clear();
           throw new Error('Session expired. Please login again.');
         }
         throw new Error('Failed to fetch travel records');
@@ -133,11 +326,15 @@ const Travel = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Close keyboard if open
+    if (showKeyboard) {
+      setShowKeyboard(false);
+      setActiveInput(null);
+    }
+    
     try {
-      // FIXED: Use correct token key that matches App.js
       const token = localStorage.getItem('access_token');
-      
-      console.log('Token found for handleSubmit:', token ? 'Yes' : 'No'); // Debug log
       
       if (!token) {
         throw new Error('No authentication token found. Please login again.');
@@ -145,7 +342,6 @@ const Travel = () => {
 
       const isPublicTransport = ['Bus', 'Train', 'Flight'].includes(formData.travel_mode);
       
-      // Validation for public transport
       if (isPublicTransport) {
         if (!formData.ticket_price || parseFloat(formData.ticket_price) <= 0) {
           throw new Error('Ticket price is required for public transport');
@@ -154,7 +350,6 @@ const Travel = () => {
           throw new Error('From and to stations are required for public transport');
         }
       } else {
-        // Validation for personal vehicles
         if (!formData.distance_km || parseFloat(formData.distance_km) <= 0) {
           throw new Error('Distance is required for personal vehicle travel');
         }
@@ -163,7 +358,6 @@ const Travel = () => {
         }
       }
 
-      // Prepare the request body
       const requestBody = {
         distance_km: isPublicTransport ? null : parseFloat(formData.distance_km),
         travel_mode: formData.travel_mode,
@@ -175,7 +369,6 @@ const Travel = () => {
         to_station: isPublicTransport ? formData.to_station : ''
       };
 
-      // Create FormData for file upload
       const formDataToSend = new FormData();
       Object.entries(requestBody).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {
@@ -197,7 +390,6 @@ const Travel = () => {
 
       if (!response.ok) {
         if (response.status === 401) {
-          localStorage.clear();
           throw new Error('Session expired. Please login again.');
         }
         const errorData = await response.json();
@@ -209,7 +401,6 @@ const Travel = () => {
         throw new Error(data.error);
       }
       
-      // Reset form
       setFormData({
         distance_km: '',
         travel_mode: 'Two Wheeler',
@@ -222,13 +413,9 @@ const Travel = () => {
       });
       setTicketFile(null);
       
-      // Refresh travel list
       await fetchTravels();
-      
-      // Show success message
       alert('Travel record added successfully!');
       
-      // Switch to history tab on mobile
       if (window.innerWidth < 768) {
         setActiveTab('history');
       }
@@ -264,13 +451,10 @@ const Travel = () => {
       }));
     }
   };
-  
+
   const viewTicket = async (travelId) => {
     try {
-      // FIXED: Use correct token key that matches App.js
       const token = localStorage.getItem('access_token');
-      
-      console.log('Token found for viewTicket:', token ? 'Yes' : 'No'); // Debug log
       
       if (!token) {
         throw new Error('No authentication token found. Please login again.');
@@ -285,20 +469,16 @@ const Travel = () => {
   
       if (!response.ok) {
         if (response.status === 401) {
-          localStorage.clear();
           throw new Error('Session expired. Please login again.');
         }
         throw new Error('Failed to fetch ticket');
       }
   
-      // Check if response is an image
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('image')) {
-        // Convert the image to a blob URL
         const imageBlob = await response.blob();
         const imageUrl = URL.createObjectURL(imageBlob);
         
-        // Open the image in a new tab
         const newWindow = window.open('', '_blank');
         if (newWindow) {
           newWindow.document.write(`
@@ -331,7 +511,6 @@ const Travel = () => {
           newWindow.document.close();
         }
       } else {
-        // Handle case where response is not an image (fallback)
         const data = await response.json();
         if (data.ticket_scan) {
           const newWindow = window.open('', '_blank');
@@ -375,7 +554,6 @@ const Travel = () => {
     }
   };
 
-  // Get the icon for the travel mode
   const getTravelModeIcon = (mode) => {
     switch (mode) {
       case 'Two Wheeler':
@@ -393,7 +571,6 @@ const Travel = () => {
     }
   };
 
-  // Calculate total amount
   const calculateTotalAmount = () => {
     return travels.reduce((total, travel) => total + (travel.calculated_amount || 0), 0).toFixed(2);
   };
@@ -420,8 +597,8 @@ const Travel = () => {
   const isPublicTransport = ['Bus', 'Train', 'Flight'].includes(formData.travel_mode);
 
   return (
-    <div className="py-6 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 min-h-screen pb-24">
-      {/* Animated Shapes - Visual Enhancement */}
+    <div className={`py-6 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 min-h-screen ${showKeyboard ? 'pb-80' : 'pb-24'}`}>
+      {/* Animated Shapes */}
       <div className="fixed top-0 right-0 -z-10 w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
       <div className="fixed top-60 right-80 -z-10 w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
       <div className="fixed bottom-0 left-20 -z-10 w-96 h-96 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
@@ -456,8 +633,8 @@ const Travel = () => {
         </div>
       )}
       
-      {/* Summary Cards - Floating at the top on desktop, bottom on mobile */}
-      <div className="hidden md:grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      {/* Summary Cards - Hidden on mobile when keyboard is open */}
+      <div className={`${showKeyboard ? 'hidden' : 'hidden md:grid'} grid-cols-1 md:grid-cols-4 gap-4 mb-8`}>
         <div className="bg-white rounded-xl shadow-xl p-5 border-l-4 border-purple-500 transform hover:scale-105 transition-all duration-300">
           <div className="flex items-center justify-between">
             <div>
@@ -467,10 +644,6 @@ const Travel = () => {
             <div className="h-14 w-14 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center shadow-lg">
               <i className="fas fa-clipboard-list text-white text-xl"></i>
             </div>
-          </div>
-          <div className="mt-3 flex items-center text-xs text-purple-500">
-            <i className="fas fa-info-circle mr-1"></i>
-            <span>All time records</span>
           </div>
         </div>
         
@@ -486,10 +659,6 @@ const Travel = () => {
               <i className="fas fa-check-circle text-white text-xl"></i>
             </div>
           </div>
-          <div className="mt-3 flex items-center text-xs text-green-500">
-            <i className="fas fa-chart-line mr-1"></i>
-            <span>Verified expenses</span>
-          </div>
         </div>
         
         <div className="bg-white rounded-xl shadow-xl p-5 border-l-4 border-yellow-500 transform hover:scale-105 transition-all duration-300">
@@ -503,10 +672,6 @@ const Travel = () => {
             <div className="h-14 w-14 rounded-full bg-gradient-to-br from-yellow-500 to-amber-500 flex items-center justify-center shadow-lg">
               <i className="fas fa-clock text-white text-xl"></i>
             </div>
-          </div>
-          <div className="mt-3 flex items-center text-xs text-yellow-500">
-            <i className="fas fa-exclamation-triangle mr-1"></i>
-            <span>Awaiting approval</span>
           </div>
         </div>
         
@@ -522,17 +687,17 @@ const Travel = () => {
               <i className="fas fa-rupee-sign text-white text-xl"></i>
             </div>
           </div>
-          <div className="mt-3 flex items-center text-xs text-blue-500">
-            <i className="fas fa-wallet mr-1"></i>
-            <span>Total claimed expenses</span>
-          </div>
         </div>
       </div>
       
       {/* Mobile Tab Navigation */}
       <div className="md:hidden mb-6 flex bg-white rounded-full p-1 shadow-md">
         <button
-          onClick={() => setActiveTab('history')}
+          onClick={() => {
+            setActiveTab('history');
+            setShowKeyboard(false);
+            setActiveInput(null);
+          }}
           className={`flex-1 py-2 px-4 rounded-full flex items-center justify-center ${
             activeTab === 'history' 
               ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md' 
@@ -543,7 +708,11 @@ const Travel = () => {
           {activeTab === 'history' && <span>History</span>}
         </button>
         <button
-          onClick={() => setActiveTab('add')}
+          onClick={() => {
+            setActiveTab('add');
+            setShowKeyboard(false);
+            setActiveInput(null);
+          }}
           className={`flex-1 py-2 px-4 rounded-full flex items-center justify-center ${
             activeTab === 'add' 
               ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md' 
@@ -580,7 +749,7 @@ const Travel = () => {
                     value={formData.travel_mode}
                     onChange={handleChange}
                     required
-                    className="w-full pl-10 pr-10 py-3 border-2 border-indigo-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all appearance-none bg-white"
+                    className="w-full pl-10 pr-10 py-3 border-2 border-indigo-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all appearance-none bg-white text-base"
                   >
                     <option value="Two Wheeler">Two Wheeler</option>
                     <option value="Four Wheeler">Four Wheeler</option>
@@ -610,21 +779,30 @@ const Travel = () => {
                     </label>
                     <div className="relative">
                       <input
+                        ref={inputRef}
                         type="text"
-                        inputMode="decimal"
-                        pattern="[0-9]*[.]?[0-9]*"
                         id="distance_km"
                         name="distance_km"
                         value={formData.distance_km}
                         onChange={handleChange}
+                        onFocus={() => window.innerWidth < 768 && openKeyboard('distance_km', 'number')}
                         required={!isPublicTransport}
                         className="w-full pl-10 pr-3 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-base"
                         placeholder="Enter distance in kilometers"
-                        style={{ fontSize: '16px' }}
+                        readOnly={window.innerWidth < 768}
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <i className="fas fa-road text-blue-500"></i>
                       </div>
+                      {window.innerWidth < 768 && (
+                        <button
+                          type="button"
+                          onClick={() => openKeyboard('distance_km', 'number')}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                        >
+                          <i className="fas fa-keyboard text-blue-400"></i>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -641,7 +819,6 @@ const Travel = () => {
                           onChange={handleChange}
                           required={!isPublicTransport}
                           className="w-full pl-10 pr-8 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none text-base"
-                          style={{ fontSize: '16px' }}
                         >
                           <option value="">Select State</option>
                           {Array.isArray(states) && states.map((state, index) => (
@@ -672,7 +849,6 @@ const Travel = () => {
                           className={`w-full pl-10 pr-8 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none text-base ${
                             !formData.state ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
                           }`}
-                          style={{ fontSize: '16px' }}
                         >
                           <option value="">Select City</option>
                           {Array.isArray(cities) && cities.map((city, index) => (
@@ -703,7 +879,6 @@ const Travel = () => {
                           className={`w-full pl-10 pr-8 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none text-base ${
                             !formData.city ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
                           }`}
-                          style={{ fontSize: '16px' }}
                         >
                           <option value="">Select Location</option>
                           {Array.isArray(locations) && locations.map((location, index) => (
@@ -737,20 +912,28 @@ const Travel = () => {
                     <div className="relative">
                       <input
                         type="text"
-                        inputMode="decimal"
-                        pattern="[0-9]*[.]?[0-9]*"
                         id="ticket_price"
                         name="ticket_price"
                         value={formData.ticket_price}
                         onChange={handleChange}
+                        onFocus={() => window.innerWidth < 768 && openKeyboard('ticket_price', 'number')}
                         required={isPublicTransport}
                         className="w-full pl-10 pr-3 py-3 border-2 border-purple-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-base"
                         placeholder="Enter ticket price"
-                        style={{ fontSize: '16px' }}
+                        readOnly={window.innerWidth < 768}
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <i className="fas fa-rupee-sign text-purple-500"></i>
                       </div>
+                      {window.innerWidth < 768 && (
+                        <button
+                          type="button"
+                          onClick={() => openKeyboard('ticket_price', 'number')}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                        >
+                          <i className="fas fa-keyboard text-purple-400"></i>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -766,14 +949,24 @@ const Travel = () => {
                           name="from_station"
                           value={formData.from_station}
                           onChange={handleChange}
+                          onFocus={() => window.innerWidth < 768 && openKeyboard('from_station', 'text')}
                           required={isPublicTransport}
                           className="w-full pl-10 pr-3 py-3 border-2 border-purple-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-base"
                           placeholder="Enter origin station"
-                          style={{ fontSize: '16px' }}
+                          readOnly={window.innerWidth < 768}
                         />
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                           <i className="fas fa-map-marker text-purple-500"></i>
                         </div>
+                        {window.innerWidth < 768 && (
+                          <button
+                            type="button"
+                            onClick={() => openKeyboard('from_station', 'text')}
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                          >
+                            <i className="fas fa-keyboard text-purple-400"></i>
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -788,14 +981,24 @@ const Travel = () => {
                           name="to_station"
                           value={formData.to_station}
                           onChange={handleChange}
+                          onFocus={() => window.innerWidth < 768 && openKeyboard('to_station', 'text')}
                           required={isPublicTransport}
                           className="w-full pl-10 pr-3 py-3 border-2 border-purple-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-base"
                           placeholder="Enter destination station"
-                          style={{ fontSize: '16px' }}
+                          readOnly={window.innerWidth < 768}
                         />
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                           <i className="fas fa-map-marker-alt text-purple-500"></i>
                         </div>
+                        {window.innerWidth < 768 && (
+                          <button
+                            type="button"
+                            onClick={() => openKeyboard('to_station', 'text')}
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                          >
+                            <i className="fas fa-keyboard text-purple-400"></i>
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -863,9 +1066,8 @@ const Travel = () => {
           </div>
         </div>
 
-        {/* Travel History Section - Rest of the component remains the same as original */}
+        {/* Travel History Section */}
         <div className={`lg:col-span-2 order-2 lg:order-1 ${activeTab === 'history' ? 'block' : 'hidden md:block'}`}>
-          {/* All the existing history section code remains unchanged */}
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-indigo-100 transform transition-all hover:shadow-2xl">
             <div className="p-5 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white flex items-center justify-between">
               <h3 className="text-xl font-bold flex items-center">
@@ -1075,7 +1277,7 @@ const Travel = () => {
           </div>
           
           {/* Mobile Summary Cards */}
-          <div className="mt-6 md:hidden grid grid-cols-2 gap-4">
+          <div className={`mt-6 md:hidden grid grid-cols-2 gap-4 ${showKeyboard ? 'hidden' : 'grid'}`}>
             <div className="bg-white rounded-xl shadow-lg p-4 border-l-4 border-purple-500">
               <div className="flex items-center justify-between">
                 <div>
@@ -1134,7 +1336,7 @@ const Travel = () => {
       </div>
       
       {/* Mobile Add Button - Floating */}
-      <div className="md:hidden fixed bottom-6 right-6 z-50">
+      <div className={`md:hidden fixed bottom-6 right-6 z-40 ${showKeyboard ? 'hidden' : 'block'}`}>
         <button
           onClick={() => setActiveTab('add')}
           className={`p-4 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg hover:from-purple-700 hover:to-indigo-700 transition-all ${
@@ -1144,6 +1346,9 @@ const Travel = () => {
           <i className="fas fa-plus text-xl"></i>
         </button>
       </div>
+
+      {/* Virtual Keyboard */}
+      <VirtualKeyboard />
     </div>
   );
 };
