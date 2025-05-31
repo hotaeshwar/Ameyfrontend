@@ -47,14 +47,27 @@ const Reports = () => {
 
   const fetchReports = async () => {
     try {
-      const token = localStorage.getItem('token')
+      // FIXED: Use correct token key that matches App.js
+      const token = localStorage.getItem('access_token')
+      
+      console.log('Token found for fetchReports:', token ? 'Yes' : 'No') // Debug log
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.')
+      }
+
       const response = await fetch('https://api.ameyaaccountsonline.info/daily-reports/my', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       })
 
       if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear()
+          throw new Error('Session expired. Please login again.')
+        }
         throw new Error('Failed to fetch daily reports')
       }
 
@@ -110,7 +123,15 @@ const Reports = () => {
     e.preventDefault()
     setSubmitting(true)
     try {
-      const token = localStorage.getItem('token')
+      // FIXED: Use correct token key that matches App.js
+      const token = localStorage.getItem('access_token')
+      
+      console.log('Token found for handleSubmit:', token ? 'Yes' : 'No') // Debug log
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.')
+      }
+
       const response = await fetch('https://api.ameyaaccountsonline.info/daily-reports', {
         method: 'POST',
         headers: {
@@ -128,6 +149,10 @@ const Reports = () => {
       })
 
       if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear()
+          throw new Error('Session expired. Please login again.')
+        }
         const errorData = await response.json()
         throw new Error(errorData.message || 'Failed to add daily report')
       }
