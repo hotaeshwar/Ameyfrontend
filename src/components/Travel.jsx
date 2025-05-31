@@ -610,16 +610,17 @@ const Travel = () => {
                     </label>
                     <div className="relative">
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
+                        pattern="[0-9]*[.]?[0-9]*"
                         id="distance_km"
                         name="distance_km"
                         value={formData.distance_km}
                         onChange={handleChange}
                         required={!isPublicTransport}
-                        min="0"
-                        step="0.01"
-                        className="w-full pl-10 pr-3 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        className="w-full pl-10 pr-3 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-base"
                         placeholder="Enter distance in kilometers"
+                        style={{ fontSize: '16px' }}
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <i className="fas fa-road text-blue-500"></i>
@@ -639,7 +640,8 @@ const Travel = () => {
                           value={formData.state}
                           onChange={handleChange}
                           required={!isPublicTransport}
-                          className="w-full pl-10 pr-8 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none"
+                          className="w-full pl-10 pr-8 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none text-base"
+                          style={{ fontSize: '16px' }}
                         >
                           <option value="">Select State</option>
                           {Array.isArray(states) && states.map((state, index) => (
@@ -667,9 +669,10 @@ const Travel = () => {
                           onChange={handleChange}
                           required={!isPublicTransport}
                           disabled={!formData.state}
-                          className={`w-full pl-10 pr-8 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none ${
+                          className={`w-full pl-10 pr-8 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none text-base ${
                             !formData.state ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
                           }`}
+                          style={{ fontSize: '16px' }}
                         >
                           <option value="">Select City</option>
                           {Array.isArray(cities) && cities.map((city, index) => (
@@ -697,9 +700,10 @@ const Travel = () => {
                           onChange={handleChange}
                           required={!isPublicTransport}
                           disabled={!formData.city}
-                          className={`w-full pl-10 pr-8 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none ${
+                          className={`w-full pl-10 pr-8 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none text-base ${
                             !formData.city ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
                           }`}
+                          style={{ fontSize: '16px' }}
                         >
                           <option value="">Select Location</option>
                           {Array.isArray(locations) && locations.map((location, index) => (
@@ -732,16 +736,17 @@ const Travel = () => {
                     </label>
                     <div className="relative">
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
+                        pattern="[0-9]*[.]?[0-9]*"
                         id="ticket_price"
                         name="ticket_price"
                         value={formData.ticket_price}
                         onChange={handleChange}
                         required={isPublicTransport}
-                        min="0"
-                        step="0.01"
-                        className="w-full pl-10 pr-3 py-3 border-2 border-purple-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                        className="w-full pl-10 pr-3 py-3 border-2 border-purple-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-base"
                         placeholder="Enter ticket price"
+                        style={{ fontSize: '16px' }}
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <i className="fas fa-rupee-sign text-purple-500"></i>
@@ -762,8 +767,9 @@ const Travel = () => {
                           value={formData.from_station}
                           onChange={handleChange}
                           required={isPublicTransport}
-                          className="w-full pl-10 pr-3 py-3 border-2 border-purple-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                          className="w-full pl-10 pr-3 py-3 border-2 border-purple-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-base"
                           placeholder="Enter origin station"
+                          style={{ fontSize: '16px' }}
                         />
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                           <i className="fas fa-map-marker text-purple-500"></i>
@@ -783,8 +789,9 @@ const Travel = () => {
                           value={formData.to_station}
                           onChange={handleChange}
                           required={isPublicTransport}
-                          className="w-full pl-10 pr-3 py-3 border-2 border-purple-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                          className="w-full pl-10 pr-3 py-3 border-2 border-purple-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-base"
                           placeholder="Enter destination station"
+                          style={{ fontSize: '16px' }}
                         />
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                           <i className="fas fa-map-marker-alt text-purple-500"></i>
