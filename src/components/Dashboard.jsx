@@ -8,7 +8,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem('token')
+        const token = localStorage.getItem('access_token')
         const response = await fetch('https://api.ameyaaccountsonline.info/profit-loss/current-month', {
           headers: { 'Authorization': `Bearer ${token}` }
         })
