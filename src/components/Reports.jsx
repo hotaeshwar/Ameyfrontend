@@ -17,7 +17,9 @@ import {
   faChartLine,
   faStoreAlt,
   faEye,
-  faExclamationTriangle
+  faExclamationTriangle,
+  faCheck,
+  faBan
 } from '@fortawesome/free-solid-svg-icons'
 
 const Reports = () => {
@@ -39,11 +41,24 @@ const Reports = () => {
     remarks: ''
   })
   const [submitting, setSubmitting] = useState(false)
+  const [userRole, setUserRole] = useState('user') // Add user role state
+  const [updatingStatus, setUpdatingStatus] = useState({})
 
   useEffect(() => {
     fetchReports()
     fetchStates()
+    checkUserRole() // Check if user is admin
   }, [])
+
+  // Function to check user role (you might need to adjust this based on your auth system)
+  const checkUserRole = () => {
+    // This should check your actual user role from localStorage, API, or context
+    const token = localStorage.getItem('access_token')
+    // You might want to decode the token or make an API call to get user role
+    // For now, I'm assuming you can determine admin status from stored data
+    const role = localStorage.getItem('user_role') || 'user'
+    setUserRole(role)
+  }
 
   const fetchReports = async () => {
     try {
@@ -116,6 +131,56 @@ const Reports = () => {
       setLocations(data.data || [])
     } catch (err) {
       console.error('Error fetching locations:', err)
+    }
+  }
+
+  // New function to update report status (for admin only)
+  const updateReportStatus = async (reportId, newStatus) => {
+    if (userRole !== 'admin') return
+
+    setUpdatingStatus(prev => ({ ...prev, [reportId]: true }))
+    
+    try {
+      const token = localStorage.getItem('access_token')
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.')
+      }
+
+      const response = await fetch(`https://api.ameyaaccountsonline.info/daily-reports/${reportId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear()
+          throw new Error('Session expired. Please login again.')
+        }
+        throw new Error('Failed to update report status')
+      }
+
+      // Update the report in the local state
+      setReports(prevReports => 
+        prevReports.map(report => 
+          report.id === reportId 
+            ? { ...report, status: newStatus }
+            : report
+        )
+      )
+
+      setSuccessMessage(`Report ${newStatus.toLowerCase()} successfully!`)
+      setShowSuccess(true)
+      setTimeout(() => setShowSuccess(false), 3000)
+
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setUpdatingStatus(prev => ({ ...prev, [reportId]: false }))
     }
   }
 
@@ -212,8 +277,85 @@ const Reports = () => {
     return reports.filter(report => report.status === status).length
   }
 
-  // Count pending reports
+  // Count pending reports - handle both null/undefined and 'Pending' status
   const pendingCount = reports.filter(report => !report.status || report.status === 'Pending').length
+
+  // Function to render status badge
+  const renderStatusBadge = (report) => {
+    const status = report.status || 'Pending' // Default to 'Pending' if no status
+    
+    if (status === 'Approved') {
+      return (
+        <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-green-100 text-green-800 flex items-center w-fit">
+          <FontAwesomeIcon icon={faClipboardCheck} className="mr-1.5" />
+          Approved
+        </span>
+      )
+    } else if (status === 'Rejected') {
+      return (
+        <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-red-100 text-red-800 flex items-center w-fit">
+          <FontAwesomeIcon icon={faTimes} className="mr-1.5" />
+          Rejected
+        </span>
+      )
+    } else {
+      return (
+        <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 flex items-center w-fit">
+          <FontAwesomeIcon icon={faHourglassHalf} className="mr-1.5" />
+          Pending
+        </span>
+      )
+    }
+  }
+
+  // Function to render action buttons (admin only)
+  const renderActionButtons = (report) => {
+    const status = report.status || 'Pending'
+    
+    if (userRole === 'admin' && status === 'Pending') {
+      return (
+        <div className="flex space-x-2">
+          <button
+            onClick={() => updateReportStatus(report.id, 'Approved')}
+            disabled={updatingStatus[report.id]}
+            className="bg-green-100 hover:bg-green-200 text-green-700 py-1.5 px-3 rounded-lg flex items-center transition-colors text-sm disabled:opacity-50"
+          >
+            {updatingStatus[report.id] ? (
+              <svg className="animate-spin h-4 w-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <FontAwesomeIcon icon={faCheck} className="mr-1.5" />
+            )}
+            Approve
+          </button>
+          <button
+            onClick={() => updateReportStatus(report.id, 'Rejected')}
+            disabled={updatingStatus[report.id]}
+            className="bg-red-100 hover:bg-red-200 text-red-700 py-1.5 px-3 rounded-lg flex items-center transition-colors text-sm disabled:opacity-50"
+          >
+            {updatingStatus[report.id] ? (
+              <svg className="animate-spin h-4 w-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <FontAwesomeIcon icon={faBan} className="mr-1.5" />
+            )}
+            Reject
+          </button>
+        </div>
+      )
+    } else {
+      return (
+        <button className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1.5 px-3 rounded-lg flex items-center transition-colors text-sm">
+          <FontAwesomeIcon icon={faEye} className="mr-1.5" />
+          View Details
+        </button>
+      )
+    }
+  }
 
   if (loading) {
     return (
@@ -245,9 +387,16 @@ const Reports = () => {
       <div className="relative mb-8">
         <h2 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 pb-2 inline-block">
           Daily Reports Management
+          {userRole === 'admin' && (
+            <span className="ml-3 text-sm bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1 rounded-full">
+              Admin Panel
+            </span>
+          )}
         </h2>
         <div className="h-1 w-24 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-full"></div>
-        <p className="mt-2 text-gray-600">Track dealer visits and manage your daily reports</p>
+        <p className="mt-2 text-gray-600">
+          {userRole === 'admin' ? 'Review and manage dealer reports' : 'Track dealer visits and manage your daily reports'}
+        </p>
       </div>
       
       {/* Error Alert */}
@@ -499,28 +648,10 @@ const Reports = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {report.status === 'Approved' ? (
-                            <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-green-100 text-green-800 flex items-center w-fit">
-                              <FontAwesomeIcon icon={faClipboardCheck} className="mr-1.5" />
-                              Approved
-                            </span>
-                          ) : report.status === 'Rejected' ? (
-                            <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-red-100 text-red-800 flex items-center w-fit">
-                              <FontAwesomeIcon icon={faTimes} className="mr-1.5" />
-                              Rejected
-                            </span>
-                          ) : (
-                            <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 flex items-center w-fit">
-                              <FontAwesomeIcon icon={faHourglassHalf} className="mr-1.5" />
-                              Pending
-                            </span>
-                          )}
+                          {renderStatusBadge(report)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <button className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1.5 px-3 rounded-lg flex items-center transition-colors text-sm">
-                            <FontAwesomeIcon icon={faEye} className="mr-1.5" />
-                            View Details
-                          </button>
+                          {renderActionButtons(report)}
                         </td>
                       </tr>
                     ))
@@ -554,22 +685,7 @@ const Reports = () => {
                         <span className="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-1 rounded-lg">
                           #{report.report_id}
                         </span>
-                        {report.status === 'Approved' ? (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 flex items-center">
-                            <FontAwesomeIcon icon={faClipboardCheck} className="mr-1" />
-                            Approved
-                          </span>
-                        ) : report.status === 'Rejected' ? (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 flex items-center">
-                            <FontAwesomeIcon icon={faTimes} className="mr-1" />
-                            Rejected
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 flex items-center">
-                            <FontAwesomeIcon icon={faHourglassHalf} className="mr-1" />
-                            Pending
-                          </span>
-                        )}
+                        {renderStatusBadge(report)}
                       </div>
                       
                       <div className="flex items-center mb-2">
@@ -599,10 +715,7 @@ const Reports = () => {
                       )}
                       
                       <div className="flex justify-end mt-2">
-                        <button className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1.5 px-3 rounded-lg flex items-center transition-colors text-sm">
-                          <FontAwesomeIcon icon={faEye} className="mr-1.5" />
-                          View Details
-                        </button>
+                        {renderActionButtons(report)}
                       </div>
                     </div>
                   ))}
@@ -843,27 +956,52 @@ const Reports = () => {
           <div className="hidden lg:block mt-6 bg-white p-5 rounded-xl shadow-lg border-l-4 border-yellow-500">
             <h4 className="text-lg font-semibold text-gray-800 mb-2 flex items-center">
               <FontAwesomeIcon icon={faExclamationTriangle} className="text-yellow-500 mr-2" />
-              Tips for Dealer Reports
+              {userRole === 'admin' ? 'Admin Guidelines' : 'Tips for Dealer Reports'}
             </h4>
             <ul className="space-y-2 text-sm text-gray-600">
-              <li className="flex items-start">
-                <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
-                  <span className="text-xs font-bold text-indigo-600">1</span>
-                </div>
-                <span>Always verify dealer details before submitting your report</span>
-              </li>
-              <li className="flex items-start">
-                <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
-                  <span className="text-xs font-bold text-indigo-600">2</span>
-                </div>
-                <span>Include specific details in remarks for better tracking</span>
-              </li>
-              <li className="flex items-start">
-                <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
-                  <span className="text-xs font-bold text-indigo-600">3</span>
-                </div>
-                <span>Submit reports promptly after dealer visits</span>
-              </li>
+              {userRole === 'admin' ? (
+                <>
+                  <li className="flex items-start">
+                    <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
+                      <span className="text-xs font-bold text-indigo-600">1</span>
+                    </div>
+                    <span>Review dealer reports carefully before approval</span>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
+                      <span className="text-xs font-bold text-indigo-600">2</span>
+                    </div>
+                    <span>Check location details and remarks for accuracy</span>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
+                      <span className="text-xs font-bold text-indigo-600">3</span>
+                    </div>
+                    <span>Process pending reports promptly for better tracking</span>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li className="flex items-start">
+                    <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
+                      <span className="text-xs font-bold text-indigo-600">1</span>
+                    </div>
+                    <span>Always verify dealer details before submitting your report</span>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
+                      <span className="text-xs font-bold text-indigo-600">2</span>
+                    </div>
+                    <span>Include specific details in remarks for better tracking</span>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
+                      <span className="text-xs font-bold text-indigo-600">3</span>
+                    </div>
+                    <span>Submit reports promptly after dealer visits</span>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
         </div>
