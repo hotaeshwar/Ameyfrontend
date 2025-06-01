@@ -7,11 +7,14 @@ const Travel = () => {
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [fromCities, setFromCities] = useState([]);
+  const [fromLocations, setFromLocations] = useState([]);
   const [ticketFile, setTicketFile] = useState(null);
   const [activeTab, setActiveTab] = useState('history');
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [keyboardType, setKeyboardType] = useState('text'); // 'text' or 'number'
   const [activeInput, setActiveInput] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const inputRef = useRef(null);
   
   const [formData, setFormData] = useState({
@@ -20,6 +23,9 @@ const Travel = () => {
     state: '',
     city: '',
     location: '',
+    from_state: '',
+    from_city: '',
+    from_location: '',
     ticket_price: '',
     from_station: '',
     to_station: ''
@@ -195,9 +201,78 @@ const Travel = () => {
     setShowKeyboard(true);
   };
 
+  // Update travel status for admin
+  const updateTravelStatus = async (travelId, newStatus, rejectionReason = '') => {
+    try {
+      const token = localStorage.getItem('access_token');
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.');
+      }
+
+      const formData = new FormData();
+      formData.append('status', newStatus);
+      if (rejectionReason) {
+        formData.append('rejection_reason', rejectionReason);
+      }
+
+      const response = await fetch(`https://api.ameyaaccountsonline.info/travel/update-status/${travelId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Session expired. Please login again.');
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.detail || errorData.message || 'Failed to update status');
+      }
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      // Refresh the travel list
+      await fetchTravels();
+      alert(`Travel record ${newStatus.toLowerCase()} successfully!`);
+      
+    } catch (err) {
+      console.error('Error updating status:', err);
+      setError(err.message);
+    }
+  };
+
+  // Handle rejection with reason
+  const handleReject = async (travelId) => {
+    const reason = prompt('Please enter rejection reason:');
+    if (reason && reason.trim()) {
+      await updateTravelStatus(travelId, 'Rejected', reason.trim());
+    }
+  };
+
   useEffect(() => {
     fetchTravels();
     fetchStates();
+    
+    // Get current user info from token
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setCurrentUser({
+          role: payload.role,
+          username: payload.sub,
+          userId: payload.user_id
+        });
+      } catch (error) {
+        console.error('Error parsing token:', error);
+      }
+    }
     
     // Add FontAwesome script dynamically
     const script = document.createElement('script');
@@ -304,6 +379,20 @@ const Travel = () => {
     }
   };
 
+  const fetchFromCities = async (state) => {
+    try {
+      const response = await fetch(`https://api.ameyaaccountsonline.info/locations/cities/${encodeURIComponent(state)}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch cities');
+      }
+      const data = await response.json();
+      setFromCities(Array.isArray(data) ? data : data.data || data.cities || []);
+    } catch (err) {
+      console.error('Error fetching from cities:', err);
+      setError(err.message);
+    }
+  };
+
   const fetchLocations = async (state, city) => {
     try {
       const response = await fetch(
@@ -316,6 +405,22 @@ const Travel = () => {
       setLocations(Array.isArray(data) ? data : data.data || data.locations || []);
     } catch (err) {
       console.error('Error fetching locations:', err);
+      setError(err.message);
+    }
+  };
+
+  const fetchFromLocations = async (state, city) => {
+    try {
+      const response = await fetch(
+        `https://api.ameyaaccountsonline.info/locations/locations/${encodeURIComponent(state)}/${encodeURIComponent(city)}`
+      );
+      if (!response.ok) {
+        throw new Error('Failed to fetch locations');
+      }
+      const data = await response.json();
+      setFromLocations(Array.isArray(data) ? data : data.data || data.locations || []);
+    } catch (err) {
+      console.error('Error fetching from locations:', err);
       setError(err.message);
     }
   };
@@ -341,6 +446,7 @@ const Travel = () => {
       }
 
       const isPublicTransport = ['Bus', 'Train', 'Flight'].includes(formData.travel_mode);
+      const isPersonalVehicle = ['Two Wheeler', 'Four Wheeler'].includes(formData.travel_mode);
       
       if (isPublicTransport) {
         if (!formData.ticket_price || parseFloat(formData.ticket_price) <= 0) {
@@ -349,12 +455,15 @@ const Travel = () => {
         if (!formData.from_station || !formData.to_station) {
           throw new Error('From and to stations are required for public transport');
         }
-      } else {
+      } else if (isPersonalVehicle) {
         if (!formData.distance_km || parseFloat(formData.distance_km) <= 0) {
           throw new Error('Distance is required for personal vehicle travel');
         }
+        if (!formData.from_state || !formData.from_city || !formData.from_location) {
+          throw new Error('From state, city, and location are required for personal vehicle travel');
+        }
         if (!formData.state || !formData.city || !formData.location) {
-          throw new Error('State, city, and location are required for personal vehicle travel');
+          throw new Error('To state, city, and location are required for personal vehicle travel');
         }
       }
 
@@ -364,6 +473,9 @@ const Travel = () => {
         state: isPublicTransport ? '' : formData.state,
         city: isPublicTransport ? '' : formData.city,
         location: isPublicTransport ? '' : formData.location,
+        from_state: isPersonalVehicle ? formData.from_state : '',
+        from_city: isPersonalVehicle ? formData.from_city : '',
+        from_location: isPersonalVehicle ? formData.from_location : '',
         ticket_price: isPublicTransport ? parseFloat(formData.ticket_price) : null,
         from_station: isPublicTransport ? formData.from_station : '',
         to_station: isPublicTransport ? formData.to_station : ''
@@ -407,6 +519,9 @@ const Travel = () => {
         state: '',
         city: '',
         location: '',
+        from_state: '',
+        from_city: '',
+        from_location: '',
         ticket_price: '',
         from_station: '',
         to_station: ''
@@ -432,6 +547,7 @@ const Travel = () => {
       [name]: value
     }));
 
+    // Handle "to" location changes
     if (name === 'state') {
       fetchCities(value);
       setFormData(prev => ({
@@ -448,6 +564,26 @@ const Travel = () => {
       setFormData(prev => ({
         ...prev,
         location: ''
+      }));
+    }
+
+    // Handle "from" location changes
+    if (name === 'from_state') {
+      fetchFromCities(value);
+      setFormData(prev => ({
+        ...prev,
+        from_city: '',
+        from_location: ''
+      }));
+      setFromCities([]);
+      setFromLocations([]);
+    }
+
+    if (name === 'from_city' && formData.from_state) {
+      fetchFromLocations(formData.from_state, value);
+      setFormData(prev => ({
+        ...prev,
+        from_location: ''
       }));
     }
   };
@@ -595,6 +731,7 @@ const Travel = () => {
   }
 
   const isPublicTransport = ['Bus', 'Train', 'Flight'].includes(formData.travel_mode);
+  const isPersonalVehicle = ['Two Wheeler', 'Four Wheeler'].includes(formData.travel_mode);
 
   return (
     <div className={`py-6 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 min-h-screen ${showKeyboard ? 'pb-80' : 'pb-24'}`}>
@@ -767,12 +904,203 @@ const Travel = () => {
               </div>
 
               {/* Personal Vehicle Fields */}
-              {!isPublicTransport && (
+              {isPersonalVehicle && (
                 <div className="space-y-5 bg-blue-50 p-4 rounded-xl">
                   <h4 className="font-semibold text-blue-800 border-b border-blue-200 pb-2 mb-3 flex items-center">
                     <i className="fas fa-car-side mr-2"></i> Vehicle Details
                   </h4>
                   
+                  {/* FROM Location Section */}
+                  <div className="bg-green-50 p-4 rounded-lg border-l-4 border-green-400">
+                    <h5 className="font-medium text-green-800 mb-3 flex items-center">
+                      <i className="fas fa-map-marker text-green-600 mr-2"></i> From Location
+                    </h5>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="md:col-span-1">
+                        <label htmlFor="from_state" className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                          <i className="fas fa-map mr-2 text-green-600"></i> State
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="from_state"
+                            name="from_state"
+                            value={formData.from_state}
+                            onChange={handleChange}
+                            required={isPersonalVehicle}
+                            className="w-full pl-10 pr-8 py-3 border-2 border-green-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all appearance-none text-base"
+                          >
+                            <option value="">Select From State</option>
+                            {Array.isArray(states) && states.map((state, index) => (
+                              <option key={index} value={state}>{state}</option>
+                            ))}
+                          </select>
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i className="fas fa-flag text-green-500"></i>
+                          </div>
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <i className="fas fa-chevron-down text-green-400"></i>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-1">
+                        <label htmlFor="from_city" className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                          <i className="fas fa-city mr-2 text-green-600"></i> City
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="from_city"
+                            name="from_city"
+                            value={formData.from_city}
+                            onChange={handleChange}
+                            required={isPersonalVehicle}
+                            disabled={!formData.from_state}
+                            className={`w-full pl-10 pr-8 py-3 border-2 border-green-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all appearance-none text-base ${
+                              !formData.from_state ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                            }`}
+                          >
+                            <option value="">Select From City</option>
+                            {Array.isArray(fromCities) && fromCities.map((city, index) => (
+                              <option key={index} value={city}>{city}</option>
+                            ))}
+                          </select>
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i className="fas fa-building text-green-500"></i>
+                          </div>
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <i className="fas fa-chevron-down text-green-400"></i>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-1">
+                        <label htmlFor="from_location" className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                          <i className="fas fa-map-marker-alt mr-2 text-green-600"></i> Location
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="from_location"
+                            name="from_location"
+                            value={formData.from_location}
+                            onChange={handleChange}
+                            required={isPersonalVehicle}
+                            disabled={!formData.from_city}
+                            className={`w-full pl-10 pr-8 py-3 border-2 border-green-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all appearance-none text-base ${
+                              !formData.from_city ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                            }`}
+                          >
+                            <option value="">Select From Location</option>
+                            {Array.isArray(fromLocations) && fromLocations.map((location, index) => (
+                              <option key={index} value={location}>{location}</option>
+                            ))}
+                          </select>
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i className="fas fa-map-pin text-green-500"></i>
+                          </div>
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <i className="fas fa-chevron-down text-green-400"></i>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TO Location Section */}
+                  <div className="bg-orange-50 p-4 rounded-lg border-l-4 border-orange-400">
+                    <h5 className="font-medium text-orange-800 mb-3 flex items-center">
+                      <i className="fas fa-map-marker-alt text-orange-600 mr-2"></i> To Location
+                    </h5>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="md:col-span-1">
+                        <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                          <i className="fas fa-map mr-2 text-orange-600"></i> State
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="state"
+                            name="state"
+                            value={formData.state}
+                            onChange={handleChange}
+                            required={isPersonalVehicle}
+                            className="w-full pl-10 pr-8 py-3 border-2 border-orange-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all appearance-none text-base"
+                          >
+                            <option value="">Select To State</option>
+                            {Array.isArray(states) && states.map((state, index) => (
+                              <option key={index} value={state}>{state}</option>
+                            ))}
+                          </select>
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i className="fas fa-flag text-orange-500"></i>
+                          </div>
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <i className="fas fa-chevron-down text-orange-400"></i>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-1">
+                        <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                          <i className="fas fa-city mr-2 text-orange-600"></i> City
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="city"
+                            name="city"
+                            value={formData.city}
+                            onChange={handleChange}
+                            required={isPersonalVehicle}
+                            disabled={!formData.state}
+                            className={`w-full pl-10 pr-8 py-3 border-2 border-orange-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all appearance-none text-base ${
+                              !formData.state ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                            }`}
+                          >
+                            <option value="">Select To City</option>
+                            {Array.isArray(cities) && cities.map((city, index) => (
+                              <option key={index} value={city}>{city}</option>
+                            ))}
+                          </select>
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i className="fas fa-building text-orange-500"></i>
+                          </div>
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <i className="fas fa-chevron-down text-orange-400"></i>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-1">
+                        <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                          <i className="fas fa-map-marker-alt mr-2 text-orange-600"></i> Location
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="location"
+                            name="location"
+                            value={formData.location}
+                            onChange={handleChange}
+                            required={isPersonalVehicle}
+                            disabled={!formData.city}
+                            className={`w-full pl-10 pr-8 py-3 border-2 border-orange-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all appearance-none text-base ${
+                              !formData.city ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                            }`}
+                          >
+                            <option value="">Select To Location</option>
+                            {Array.isArray(locations) && locations.map((location, index) => (
+                              <option key={index} value={location}>{location}</option>
+                            ))}
+                          </select>
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i className="fas fa-map-pin text-orange-500"></i>
+                          </div>
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <i className="fas fa-chevron-down text-orange-400"></i>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Distance Field - Moved to bottom */}
                   <div>
                     <label htmlFor="distance_km" className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
                       <i className="fas fa-ruler mr-2 text-blue-600"></i> Distance (km)
@@ -786,7 +1114,7 @@ const Travel = () => {
                         value={formData.distance_km}
                         onChange={handleChange}
                         onFocus={() => window.innerWidth < 768 && openKeyboard('distance_km', 'number')}
-                        required={!isPublicTransport}
+                        required={isPersonalVehicle}
                         className="w-full pl-10 pr-3 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-base"
                         placeholder="Enter distance in kilometers"
                         readOnly={window.innerWidth < 768}
@@ -803,95 +1131,6 @@ const Travel = () => {
                           <i className="fas fa-keyboard text-blue-400"></i>
                         </button>
                       )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-1">
-                      <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                        <i className="fas fa-map mr-2 text-blue-600"></i> State
-                      </label>
-                      <div className="relative">
-                        <select
-                          id="state"
-                          name="state"
-                          value={formData.state}
-                          onChange={handleChange}
-                          required={!isPublicTransport}
-                          className="w-full pl-10 pr-8 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none text-base"
-                        >
-                          <option value="">Select State</option>
-                          {Array.isArray(states) && states.map((state, index) => (
-                            <option key={index} value={state}>{state}</option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <i className="fas fa-flag text-blue-500"></i>
-                        </div>
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <i className="fas fa-chevron-down text-blue-400"></i>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="md:col-span-1">
-                      <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                        <i className="fas fa-city mr-2 text-blue-600"></i> City
-                      </label>
-                      <div className="relative">
-                        <select
-                          id="city"
-                          name="city"
-                          value={formData.city}
-                          onChange={handleChange}
-                          required={!isPublicTransport}
-                          disabled={!formData.state}
-                          className={`w-full pl-10 pr-8 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none text-base ${
-                            !formData.state ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                        >
-                          <option value="">Select City</option>
-                          {Array.isArray(cities) && cities.map((city, index) => (
-                            <option key={index} value={city}>{city}</option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <i className="fas fa-building text-blue-500"></i>
-                        </div>
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <i className="fas fa-chevron-down text-blue-400"></i>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="md:col-span-1">
-                      <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                        <i className="fas fa-map-marker-alt mr-2 text-blue-600"></i> Location
-                      </label>
-                      <div className="relative">
-                        <select
-                          id="location"
-                          name="location"
-                          value={formData.location}
-                          onChange={handleChange}
-                          required={!isPublicTransport}
-                          disabled={!formData.city}
-                          className={`w-full pl-10 pr-8 py-3 border-2 border-blue-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none text-base ${
-                            !formData.city ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                        >
-                          <option value="">Select Location</option>
-                          {Array.isArray(locations) && locations.map((location, index) => (
-                            <option key={index} value={location}>{location}</option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <i className="fas fa-map-pin text-blue-500"></i>
-                        </div>
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <i className="fas fa-chevron-down text-blue-400"></i>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1143,6 +1382,12 @@ const Travel = () => {
                               <i className="fas fa-arrow-right text-xs text-indigo-400 mx-1"></i>
                               <span>{travel.to_station}</span>
                             </div>
+                          ) : travel.from_location && travel.location ? (
+                            <div className="flex items-center space-x-1">
+                              <span>{travel.from_location}</span>
+                              <i className="fas fa-arrow-right text-xs text-indigo-400 mx-1"></i>
+                              <span>{travel.location}</span>
+                            </div>
                           ) : (
                             <span>{travel.location || '-'}</span>
                           )}
@@ -1154,27 +1399,61 @@ const Travel = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            travel.status === 'Approved' ? 'bg-green-100 text-green-800' : 
-                            travel.status === 'Rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            <i className={`mr-1 ${
-                              travel.status === 'Approved' ? 'fas fa-check-circle text-green-600' : 
-                              travel.status === 'Rejected' ? 'fas fa-times-circle text-red-600' : 'fas fa-clock text-yellow-600'
-                            }`}></i>
-                            {travel.status || 'Pending'}
-                          </span>
+                          {(currentUser?.role !== 'admin' || travel.status !== 'Pending') && (
+                            <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              travel.status === 'Approved' ? 'bg-green-100 text-green-800' : 
+                              travel.status === 'Rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              <i className={`mr-1 ${
+                                travel.status === 'Approved' ? 'fas fa-check-circle text-green-600' : 
+                                travel.status === 'Rejected' ? 'fas fa-times-circle text-red-600' : 'fas fa-clock text-yellow-600'
+                              }`}></i>
+                              {travel.status || 'Pending'}
+                              {travel.status === 'Rejected' && travel.rejection_reason && (
+                                <span className="ml-1" title={travel.rejection_reason}>
+                                  <i className="fas fa-info-circle"></i>
+                                </span>
+                              )}
+                            </span>
+                          )}
+                          {currentUser?.role === 'admin' && travel.status === 'Pending' && (
+                            <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                              <i className="fas fa-exclamation-triangle mr-1"></i>
+                              Needs Review
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {(travel.ticket_price || travel.ticket_scan) && (
-                            <button 
-                              onClick={() => viewTicket(travel.travel_id)}
-                              className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-3 rounded-full flex items-center transition-colors"
-                            >
-                              <i className="fas fa-ticket-alt mr-1"></i>
-                              <span>View</span>
-                            </button>
-                          )}
+                          <div className="flex space-x-2">
+                            {(travel.ticket_price || travel.ticket_scan) && (
+                              <button 
+                                onClick={() => viewTicket(travel.travel_id)}
+                                className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-3 rounded-full flex items-center transition-colors"
+                              >
+                                <i className="fas fa-ticket-alt mr-1"></i>
+                                <span>View</span>
+                              </button>
+                            )}
+                            
+                            {currentUser?.role === 'admin' && travel.status === 'Pending' && (
+                              <>
+                                <button 
+                                  onClick={() => updateTravelStatus(travel.travel_id, 'Approved')}
+                                  className="bg-green-100 hover:bg-green-200 text-green-700 py-1 px-3 rounded-full flex items-center transition-colors"
+                                >
+                                  <i className="fas fa-check mr-1"></i>
+                                  <span>Approve</span>
+                                </button>
+                                <button 
+                                  onClick={() => handleReject(travel.travel_id)}
+                                  className="bg-red-100 hover:bg-red-200 text-red-700 py-1 px-3 rounded-full flex items-center transition-colors"
+                                >
+                                  <i className="fas fa-times mr-1"></i>
+                                  <span>Reject</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1205,16 +1484,23 @@ const Travel = () => {
                         <span className="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-1 rounded-full">
                           #{travel.travel_id}
                         </span>
-                        <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          travel.status === 'Approved' ? 'bg-green-100 text-green-800' : 
-                          travel.status === 'Rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          <i className={`mr-1 ${
-                            travel.status === 'Approved' ? 'fas fa-check-circle' : 
-                            travel.status === 'Rejected' ? 'fas fa-times-circle' : 'fas fa-clock'
-                          }`}></i>
-                          {travel.status || 'Pending'}
-                        </span>
+                        {(currentUser?.role !== 'admin' || travel.status !== 'Pending') ? (
+                          <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            travel.status === 'Approved' ? 'bg-green-100 text-green-800' : 
+                            travel.status === 'Rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            <i className={`mr-1 ${
+                              travel.status === 'Approved' ? 'fas fa-check-circle' : 
+                              travel.status === 'Rejected' ? 'fas fa-times-circle' : 'fas fa-clock'
+                            }`}></i>
+                            {travel.status || 'Pending'}
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                            <i className="fas fa-exclamation-triangle mr-1"></i>
+                            Needs Review
+                          </span>
+                        )}
                       </div>
                       
                       <div className="flex items-center mb-2">
@@ -1231,6 +1517,13 @@ const Travel = () => {
                           <i className="fas fa-arrow-right text-xs text-indigo-400 mx-1"></i>
                           <span>{travel.to_station}</span>
                         </div>
+                      ) : travel.from_location && travel.location ? (
+                        <div className="flex items-center text-sm text-gray-600 mb-2 bg-blue-50 p-2 rounded-lg">
+                          <i className="fas fa-map-pin text-blue-500 mr-1"></i>
+                          <span>{travel.from_location}</span>
+                          <i className="fas fa-arrow-right text-xs text-indigo-400 mx-1"></i>
+                          <span>{travel.location}</span>
+                        </div>
                       ) : travel.location ? (
                         <div className="flex items-center text-sm text-gray-600 mb-2 bg-blue-50 p-2 rounded-lg">
                           <i className="fas fa-map-pin text-blue-500 mr-1"></i>
@@ -1244,16 +1537,47 @@ const Travel = () => {
                           <span>{travel.calculated_amount?.toFixed(2) || '0.00'}</span>
                         </div>
                         
-                        {(travel.ticket_price || travel.ticket_scan) && (
-                          <button 
-                            onClick={() => viewTicket(travel.travel_id)}
-                            className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-3 rounded-lg flex items-center transition-colors"
-                          >
-                            <i className="fas fa-ticket-alt mr-1"></i>
-                            <span>View Ticket</span>
-                          </button>
-                        )}
+                        <div className="flex space-x-2">
+                          {(travel.ticket_price || travel.ticket_scan) && (
+                            <button 
+                              onClick={() => viewTicket(travel.travel_id)}
+                              className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-3 rounded-lg flex items-center transition-colors"
+                            >
+                              <i className="fas fa-ticket-alt mr-1"></i>
+                              <span>View</span>
+                            </button>
+                          )}
+                          
+                          {currentUser?.role === 'admin' && travel.status === 'Pending' ? (
+                            <div className="flex space-x-1">
+                              <button 
+                                onClick={() => updateTravelStatus(travel.travel_id, 'Approved')}
+                                className="bg-green-100 hover:bg-green-200 text-green-700 py-1 px-2 rounded-lg flex items-center transition-colors text-sm"
+                              >
+                                <i className="fas fa-check"></i>
+                              </button>
+                              <button 
+                                onClick={() => handleReject(travel.travel_id)}
+                                className="bg-red-100 hover:bg-red-200 text-red-700 py-1 px-2 rounded-lg flex items-center transition-colors text-sm"
+                              >
+                                <i className="fas fa-times"></i>
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
+                      
+                      {travel.status === 'Rejected' && travel.rejection_reason && (
+                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                          <div className="flex items-start">
+                            <i className="fas fa-info-circle text-red-500 mt-0.5 mr-2"></i>
+                            <div>
+                              <p className="text-xs font-medium text-red-800">Rejection Reason:</p>
+                              <p className="text-xs text-red-700">{travel.rejection_reason}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
