@@ -18,8 +18,10 @@ import {
   faStoreAlt,
   faEye,
   faExclamationTriangle,
-  faCheck,
-  faXmark
+  faArrowLeft,
+  faUserTie,
+  faCalendarDay,
+  faInfoCircle
 } from '@fortawesome/free-solid-svg-icons'
 
 const Reports = () => {
@@ -29,9 +31,11 @@ const Reports = () => {
   const [states, setStates] = useState([])
   const [cities, setCities] = useState([])
   const [locations, setLocations] = useState([])
-  const [activeTab, setActiveTab] = useState('reports') // 'reports' or 'add'
+  const [activeTab, setActiveTab] = useState('reports') // 'reports', 'add', or 'view'
   const [showSuccess, setShowSuccess] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+  const [selectedReport, setSelectedReport] = useState(null)
+  const [viewLoading, setViewLoading] = useState(false)
   const [formData, setFormData] = useState({
     dealer_name: '',
     dealer_type: '0-1L',
@@ -41,42 +45,24 @@ const Reports = () => {
     remarks: ''
   })
   const [submitting, setSubmitting] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [updatingReports, setUpdatingReports] = useState({})
 
   useEffect(() => {
     fetchReports()
     fetchStates()
   }, [])
 
-
-
   const fetchReports = async () => {
     try {
+      // FIXED: Use correct token key that matches App.js
       const token = localStorage.getItem('access_token')
       
-      console.log('Token found for fetchReports:', token ? 'Yes' : 'No')
+      console.log('Token found for fetchReports:', token ? 'Yes' : 'No') // Debug log
       
       if (!token) {
         throw new Error('No authentication token found. Please login again.')
       }
 
-      // First check user role, then use appropriate endpoint
-      let userRole = 'guest'
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        userRole = payload.role || 'guest'
-        setIsAdmin(userRole === 'admin')
-      } catch (e) {
-        console.error('Error decoding token:', e)
-      }
-
-      // Use different endpoint based on user role
-      const endpoint = userRole === 'admin' ? 
-        'https://api.ameyaaccountsonline.info/daily-reports/all' : 
-        'https://api.ameyaaccountsonline.info/daily-reports/my'
-
-      const response = await fetch(endpoint, {
+      const response = await fetch('https://api.ameyaaccountsonline.info/daily-reports/my', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -97,6 +83,51 @@ const Reports = () => {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchReportDetails = async (reportId) => {
+    setViewLoading(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.')
+      }
+
+      const response = await fetch(`https://api.ameyaaccountsonline.info/daily-reports/${reportId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear()
+          throw new Error('Session expired. Please login again.')
+        }
+        throw new Error('Failed to fetch report details')
+      }
+
+      const data = await response.json()
+      setSelectedReport(data.data)
+      setActiveTab('view')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setViewLoading(false)
+    }
+  }
+
+  const handleViewReport = (report) => {
+    // If we already have the report data, use it directly
+    if (report.id || report._id) {
+      setSelectedReport(report)
+      setActiveTab('view')
+    } else {
+      // Otherwise fetch detailed data
+      fetchReportDetails(report.report_id || report.id)
     }
   }
 
@@ -143,9 +174,10 @@ const Reports = () => {
     e.preventDefault()
     setSubmitting(true)
     try {
+      // FIXED: Use correct token key that matches App.js
       const token = localStorage.getItem('access_token')
       
-      console.log('Token found for handleSubmit:', token ? 'Yes' : 'No')
+      console.log('Token found for handleSubmit:', token ? 'Yes' : 'No') // Debug log
       
       if (!token) {
         throw new Error('No authentication token found. Please login again.')
@@ -177,7 +209,7 @@ const Reports = () => {
       }
 
       const data = await response.json()
-      setReports([data.data, ...reports])
+      setReports([...reports, data.data])
       setFormData({
         dealer_name: '',
         dealer_type: '0-1L',
@@ -226,68 +258,18 @@ const Reports = () => {
     }
   }
 
-  // FIXED: Update report status function
-  const updateReportStatus = async (reportId, status, rejectionReason = null) => {
-    const token = localStorage.getItem('access_token')
-    if (!token || !isAdmin) {
-      setError('Unauthorized to update report status')
-      return
-    }
-
-    setUpdatingReports(prev => ({ ...prev, [reportId]: true }))
-
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A'
     try {
-      // Create FormData for the request
-      const formData = new FormData()
-      formData.append('status', status)
-      if (rejectionReason) {
-        formData.append('rejection_reason', rejectionReason)
-      }
-
-      // FIXED: Use the correct endpoint and method from backend
-      const response = await fetch(`https://api.ameyaaccountsonline.info/daily-report/update-status/${reportId}`, {
-        method: 'POST', // Backend expects POST, not PATCH
-        headers: {
-          'Authorization': `Bearer ${token}`
-          // Don't set Content-Type for FormData, let browser set it
-        },
-        body: formData
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
       })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Failed to update report status')
-      }
-
-      const data = await response.json()
-      
-      // Update the reports list with the updated report
-      setReports(prev => prev.map(report => 
-        report.report_id === reportId 
-          ? { ...report, status: status, rejection_reason: rejectionReason }
-          : report
-      ))
-
-      setSuccessMessage(`Report ${status.toLowerCase()} successfully!`)
-      setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), 3000)
-      
-    } catch (err) {
-      console.error('Error updating report status:', err)
-      setError(err.message)
-    } finally {
-      setUpdatingReports(prev => ({ ...prev, [reportId]: false }))
-    }
-  }
-
-  const handleApprove = (reportId) => {
-    updateReportStatus(reportId, 'Approved')
-  }
-
-  const handleReject = (reportId) => {
-    const reason = prompt('Please enter rejection reason:')
-    if (reason && reason.trim()) {
-      updateReportStatus(reportId, 'Rejected', reason.trim())
+    } catch {
+      return dateString
     }
   }
 
@@ -318,6 +300,154 @@ const Reports = () => {
     )
   }
 
+  // Report Detail View Component
+  const ReportDetailView = () => {
+    if (!selectedReport) return null
+
+    return (
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        {/* Header */}
+        <div className="p-6 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <button
+                onClick={() => {
+                  setActiveTab('reports')
+                  setSelectedReport(null)
+                }}
+                className="bg-white bg-opacity-20 rounded-full p-2 mr-4 hover:bg-opacity-30 transition-all"
+              >
+                <FontAwesomeIcon icon={faArrowLeft} />
+              </button>
+              <div>
+                <h3 className="text-xl font-bold">Report Details</h3>
+                <p className="text-purple-100">Report #{selectedReport.report_id || selectedReport.id}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              {selectedReport.status === 'Approved' ? (
+                <span className="px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-800 flex items-center">
+                  <FontAwesomeIcon icon={faClipboardCheck} className="mr-1.5" />
+                  Approved
+                </span>
+              ) : selectedReport.status === 'Rejected' ? (
+                <span className="px-3 py-1.5 rounded-full text-sm font-medium bg-red-100 text-red-800 flex items-center">
+                  <FontAwesomeIcon icon={faTimes} className="mr-1.5" />
+                  Rejected
+                </span>
+              ) : (
+                <span className="px-3 py-1.5 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 flex items-center">
+                  <FontAwesomeIcon icon={faHourglassHalf} className="mr-1.5" />
+                  Pending
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-6">
+          {/* Dealer Information */}
+          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-5 rounded-xl">
+            <h4 className="text-lg font-semibold text-indigo-800 mb-4 flex items-center">
+              <FontAwesomeIcon icon={faStoreAlt} className="mr-2" />
+              Dealer Information
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white p-4 rounded-lg shadow-sm">
+                <label className="text-sm font-medium text-gray-600">Dealer Name</label>
+                <p className="text-lg font-semibold text-gray-900 mt-1">{selectedReport.dealer_name}</p>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm">
+                <label className="text-sm font-medium text-gray-600">Dealer Type</label>
+                <p className="text-lg font-semibold text-indigo-600 mt-1">{selectedReport.dealer_type}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Location Information */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 rounded-xl">
+            <h4 className="text-lg font-semibold text-blue-800 mb-4 flex items-center">
+              <FontAwesomeIcon icon={faLocationDot} className="mr-2" />
+              Location Details
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white p-4 rounded-lg shadow-sm">
+                <label className="text-sm font-medium text-gray-600">State</label>
+                <p className="text-lg font-semibold text-gray-900 mt-1">{selectedReport.state}</p>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm">
+                <label className="text-sm font-medium text-gray-600">City</label>
+                <p className="text-lg font-semibold text-gray-900 mt-1">{selectedReport.city}</p>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm">
+                <label className="text-sm font-medium text-gray-600">Location</label>
+                <p className="text-lg font-semibold text-gray-900 mt-1">{selectedReport.location}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Information */}
+          {selectedReport.remarks && (
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-5 rounded-xl">
+              <h4 className="text-lg font-semibold text-green-800 mb-4 flex items-center">
+                <FontAwesomeIcon icon={faComment} className="mr-2" />
+                Remarks
+              </h4>
+              <div className="bg-white p-4 rounded-lg shadow-sm">
+                <p className="text-gray-700 leading-relaxed">{selectedReport.remarks}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Report Metadata */}
+          <div className="bg-gradient-to-r from-gray-50 to-slate-50 p-5 rounded-xl">
+            <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+              <FontAwesomeIcon icon={faInfoCircle} className="mr-2" />
+              Report Information
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white p-4 rounded-lg shadow-sm">
+                <label className="text-sm font-medium text-gray-600">Submitted By</label>
+                <p className="text-lg font-semibold text-gray-900 mt-1 flex items-center">
+                  <FontAwesomeIcon icon={faUserTie} className="mr-2 text-gray-500" />
+                  {selectedReport.submitted_by || selectedReport.user_name || 'N/A'}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm">
+                <label className="text-sm font-medium text-gray-600">Submitted Date</label>
+                <p className="text-lg font-semibold text-gray-900 mt-1 flex items-center">
+                  <FontAwesomeIcon icon={faCalendarDay} className="mr-2 text-gray-500" />
+                  {formatDate(selectedReport.created_at || selectedReport.submitted_date)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Admin Actions (if needed) */}
+          {selectedReport.status === 'Pending' && (
+            <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-5 rounded-xl border-l-4 border-yellow-400">
+              <h4 className="text-lg font-semibold text-yellow-800 mb-4 flex items-center">
+                <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2" />
+                Admin Actions
+              </h4>
+              <div className="flex flex-wrap gap-3">
+                <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors">
+                  <FontAwesomeIcon icon={faClipboardCheck} className="mr-2" />
+                  Approve Report
+                </button>
+                <button className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors">
+                  <FontAwesomeIcon icon={faTimes} className="mr-2" />
+                  Reject Report
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="px-4 py-6 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 min-h-screen">
       {/* Animated Background Elements */}
@@ -326,13 +456,15 @@ const Reports = () => {
       <div className="fixed top-60 -left-20 -z-10 w-72 h-72 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
       
       {/* Page Header */}
-      <div className="relative mb-8">
-        <h2 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 pb-2 inline-block">
-          Daily Reports Management
-        </h2>
-        <div className="h-1 w-24 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-full"></div>
-        <p className="mt-2 text-gray-600">Track dealer visits and manage your daily reports</p>
-      </div>
+      {activeTab !== 'view' && (
+        <div className="relative mb-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 pb-2 inline-block">
+            Daily Reports Management
+          </h2>
+          <div className="h-1 w-24 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-full"></div>
+          <p className="mt-2 text-gray-600">Track dealer visits and manage your daily reports</p>
+        </div>
+      )}
       
       {/* Error Alert */}
       {error && (
@@ -375,549 +507,454 @@ const Reports = () => {
           </button>
         </div>
       )}
+
+      {/* View Loading */}
+      {viewLoading && (
+        <div className="flex justify-center items-center py-12">
+          <div className="relative">
+            <div className="h-16 w-16 rounded-full border-t-4 border-b-4 border-purple-700 animate-spin"></div>
+            <div className="absolute top-0 left-0 right-0 bottom-0 flex items-center justify-center">
+              <FontAwesomeIcon icon={faEye} className="text-xl text-purple-700 animate-pulse" />
+            </div>
+          </div>
+          <div className="ml-4">
+            <span className="text-lg font-semibold text-purple-700">Loading Report Details...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Render Report Detail View */}
+      {activeTab === 'view' && !viewLoading && <ReportDetailView />}
       
       {/* Stats Cards */}
-      <div className="hidden md:grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-purple-500 transform hover:scale-105 transition-all duration-300">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm">Total Reports</p>
-              <p className="text-2xl font-bold text-gray-900">{reports.length}</p>
+      {activeTab !== 'view' && (
+        <div className="hidden md:grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-purple-500 transform hover:scale-105 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm">Total Reports</p>
+                <p className="text-2xl font-bold text-gray-900">{reports.length}</p>
+              </div>
+              <div className="h-14 w-14 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center justify-center shadow-lg">
+                <FontAwesomeIcon icon={faClipboardCheck} className="text-white text-xl" />
+              </div>
             </div>
-            <div className="h-14 w-14 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center justify-center shadow-lg">
-              <FontAwesomeIcon icon={faClipboardCheck} className="text-white text-xl" />
+            <div className="mt-3 flex items-center text-xs text-purple-600">
+              <FontAwesomeIcon icon={faCalendarAlt} className="mr-1" />
+              <span>All time reports</span>
             </div>
           </div>
-          <div className="mt-3 flex items-center text-xs text-purple-600">
-            <FontAwesomeIcon icon={faCalendarAlt} className="mr-1" />
-            <span>All time reports</span>
+          
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500 transform hover:scale-105 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm">Approved</p>
+                <p className="text-2xl font-bold text-gray-900">{countByStatus('Approved')}</p>
+              </div>
+              <div className="h-14 w-14 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center shadow-lg">
+                <FontAwesomeIcon icon={faClipboardCheck} className="text-white text-xl" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center text-xs text-green-600">
+              <FontAwesomeIcon icon={faChartLine} className="mr-1" />
+              <span>Verified reports</span>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500 transform hover:scale-105 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm">Pending</p>
+                <p className="text-2xl font-bold text-gray-900">{pendingCount}</p>
+              </div>
+              <div className="h-14 w-14 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500 flex items-center justify-center shadow-lg">
+                <FontAwesomeIcon icon={faHourglassHalf} className="text-white text-xl" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center text-xs text-yellow-600">
+              <FontAwesomeIcon icon={faExclamationTriangle} className="mr-1" />
+              <span>Awaiting approval</span>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-blue-500 transform hover:scale-105 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm">Dealers</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {new Set(reports.map(r => r.dealer_name)).size}
+                </p>
+              </div>
+              <div className="h-14 w-14 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg">
+                <FontAwesomeIcon icon={faStoreAlt} className="text-white text-xl" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center text-xs text-blue-600">
+              <FontAwesomeIcon icon={faStore} className="mr-1" />
+              <span>Unique dealers visited</span>
+            </div>
           </div>
         </div>
-        
-        <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-green-500 transform hover:scale-105 transition-all duration-300">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm">Approved</p>
-              <p className="text-2xl font-bold text-gray-900">{countByStatus('Approved')}</p>
-            </div>
-            <div className="h-14 w-14 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center shadow-lg">
-              <FontAwesomeIcon icon={faClipboardCheck} className="text-white text-xl" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-center text-xs text-green-600">
-            <FontAwesomeIcon icon={faChartLine} className="mr-1" />
-            <span>Verified reports</span>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-yellow-500 transform hover:scale-105 transition-all duration-300">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm">Pending</p>
-              <p className="text-2xl font-bold text-gray-900">{pendingCount}</p>
-            </div>
-            <div className="h-14 w-14 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500 flex items-center justify-center shadow-lg">
-              <FontAwesomeIcon icon={faHourglassHalf} className="text-white text-xl" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-center text-xs text-yellow-600">
-            <FontAwesomeIcon icon={faExclamationTriangle} className="mr-1" />
-            <span>Awaiting approval</span>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-lg p-5 border-l-4 border-blue-500 transform hover:scale-105 transition-all duration-300">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm">Dealers</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {new Set(reports.map(r => r.dealer_name)).size}
-              </p>
-            </div>
-            <div className="h-14 w-14 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg">
-              <FontAwesomeIcon icon={faStoreAlt} className="text-white text-xl" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-center text-xs text-blue-600">
-            <FontAwesomeIcon icon={faStore} className="mr-1" />
-            <span>Unique dealers visited</span>
-          </div>
-        </div>
-      </div>
+      )}
       
       {/* Mobile Tab Navigation */}
-      <div className="md:hidden mb-6 flex bg-white rounded-full p-1 shadow-md">
-        <button
-          onClick={() => setActiveTab('reports')}
-          className={`flex-1 py-2 px-4 rounded-full flex items-center justify-center ${
-            activeTab === 'reports' 
-              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md' 
-              : 'text-gray-600'
-          }`}
-        >
-          <FontAwesomeIcon icon={faClipboardCheck} className={activeTab === 'reports' ? 'mr-2' : ''} />
-          {activeTab === 'reports' && <span>Reports</span>}
-        </button>
-        <button
-          onClick={() => setActiveTab('add')}
-          className={`flex-1 py-2 px-4 rounded-full flex items-center justify-center ${
-            activeTab === 'add' 
-              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md' 
-              : 'text-gray-600'
-          }`}
-        >
-          <FontAwesomeIcon icon={faPlus} className={activeTab === 'add' ? 'mr-2' : ''} />
-          {activeTab === 'add' && <span>Add New</span>}
-        </button>
-      </div>
+      {activeTab !== 'view' && (
+        <div className="md:hidden mb-6 flex bg-white rounded-full p-1 shadow-md">
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`flex-1 py-2 px-4 rounded-full flex items-center justify-center ${
+              activeTab === 'reports' 
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md' 
+                : 'text-gray-600'
+            }`}
+          >
+            <FontAwesomeIcon icon={faClipboardCheck} className={activeTab === 'reports' ? 'mr-2' : ''} />
+            {activeTab === 'reports' && <span>Reports</span>}
+          </button>
+          <button
+            onClick={() => setActiveTab('add')}
+            className={`flex-1 py-2 px-4 rounded-full flex items-center justify-center ${
+              activeTab === 'add' 
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md' 
+                : 'text-gray-600'
+            }`}
+          >
+            <FontAwesomeIcon icon={faPlus} className={activeTab === 'add' ? 'mr-2' : ''} />
+            {activeTab === 'add' && <span>Add New</span>}
+          </button>
+        </div>
+      )}
       
       {/* Mobile Stats Summary */}
-      <div className="md:hidden grid grid-cols-2 gap-3 mb-6">
-        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-purple-500 flex items-center justify-between">
-          <div>
-            <p className="text-xs text-gray-500">Total</p>
-            <p className="text-lg font-bold text-gray-900">{reports.length}</p>
+      {activeTab !== 'view' && (
+        <div className="md:hidden grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-white rounded-lg shadow p-3 border-l-4 border-purple-500 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500">Total</p>
+              <p className="text-lg font-bold text-gray-900">{reports.length}</p>
+            </div>
+            <div className="h-10 w-10 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center justify-center">
+              <FontAwesomeIcon icon={faClipboardCheck} className="text-white" />
+            </div>
           </div>
-          <div className="h-10 w-10 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center justify-center">
-            <FontAwesomeIcon icon={faClipboardCheck} className="text-white" />
+          
+          <div className="bg-white rounded-lg shadow p-3 border-l-4 border-yellow-500 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500">Pending</p>
+              <p className="text-lg font-bold text-gray-900">{pendingCount}</p>
+            </div>
+            <div className="h-10 w-10 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500 flex items-center justify-center">
+              <FontAwesomeIcon icon={faHourglassHalf} className="text-white" />
+            </div>
           </div>
         </div>
-        
-        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-yellow-500 flex items-center justify-between">
-          <div>
-            <p className="text-xs text-gray-500">Pending</p>
-            <p className="text-lg font-bold text-gray-900">{pendingCount}</p>
-          </div>
-          <div className="h-10 w-10 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500 flex items-center justify-center">
-            <FontAwesomeIcon icon={faHourglassHalf} className="text-white" />
-          </div>
-        </div>
-      </div>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Reports Table Section */}
-        <div className={`lg:col-span-2 ${activeTab === 'reports' ? 'block' : 'hidden md:block'}`}>
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl relative">
-            <div className="p-5 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold flex items-center">
-                  <div className="bg-white bg-opacity-20 rounded-full p-2 mr-3">
-                    <FontAwesomeIcon icon={faClipboardCheck} />
-                  </div>
-                  Recent Reports
-                </h3>
-                <div className="hidden md:flex items-center bg-white bg-opacity-20 rounded-full px-3 py-1">
-                  <FontAwesomeIcon icon={faFilter} className="mr-2" />
-                  <span className="text-sm">{reports.length} Reports</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* Desktop/Tablet Table View */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gradient-to-r from-indigo-50 to-purple-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">
-                      <div className="flex items-center">
-                        <FontAwesomeIcon icon={faFileAlt} className="mr-2" /> Report
-                      </div>
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">
-                      <div className="flex items-center">
-                        <FontAwesomeIcon icon={faStore} className="mr-2" /> Dealer
-                      </div>
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">
-                      <div className="flex items-center">
-                        <FontAwesomeIcon icon={faLocationDot} className="mr-2" /> Location
-                      </div>
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">
-                      <div className="flex items-center">
-                        <FontAwesomeIcon icon={faClipboardCheck} className="mr-2" /> Status
-                      </div>
-                    </th>
-                    {isAdmin && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">
-                        <div className="flex items-center">
-                          <FontAwesomeIcon icon={faUser} className="mr-2" /> User
-                        </div>
-                      </th>
-                    )}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">
-                      <div className="flex items-center">
-                        <FontAwesomeIcon icon={faEye} className="mr-2" /> Action
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {reports.length === 0 ? (
-                    <tr>
-                      <td colSpan={isAdmin ? "6" : "5"} className="px-6 py-10 text-center text-gray-500">
-                        <div className="flex flex-col items-center justify-center">
-                          <div className="rounded-full bg-indigo-100 p-4 mb-4">
-                            <FontAwesomeIcon icon={faClipboardCheck} className="text-4xl text-indigo-400" />
-                          </div>
-                          <p className="text-lg font-medium text-gray-600">No reports found</p>
-                          <p className="text-sm mt-1 text-gray-500">Create your first report to get started!</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    reports.map((report, index) => (
-                      <tr key={report.id || index} className="hover:bg-indigo-50 transition-colors duration-150">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-1.5 rounded-lg">
-                            #{report.report_id}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex flex-col">
-                            <span className="font-medium text-gray-900">{report.dealer_name}</span>
-                            <span className="text-xs text-indigo-600 mt-1 bg-indigo-50 px-2 py-0.5 rounded w-fit">
-                              {report.dealer_type}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          <div className="flex items-start max-w-xs">
-                            <FontAwesomeIcon icon={faLocationDot} className="mr-2 text-indigo-400 mt-1" />
-                            <span className="truncate">
-                              {report.location}, {report.city}, {report.state}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {report.status === 'Approved' ? (
-                            <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-green-100 text-green-800 flex items-center w-fit">
-                              <FontAwesomeIcon icon={faClipboardCheck} className="mr-1.5" />
-                              Approved
-                            </span>
-                          ) : report.status === 'Rejected' ? (
-                            <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-red-100 text-red-800 flex items-center w-fit">
-                              <FontAwesomeIcon icon={faTimes} className="mr-1.5" />
-                              Rejected
-                            </span>
-                          ) : (
-                            <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 flex items-center w-fit">
-                              <FontAwesomeIcon icon={faHourglassHalf} className="mr-1.5" />
-                              Pending
-                            </span>
-                          )}
-                        </td>
-                        {isAdmin && (
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                            <span className="font-medium">{report.username}</span>
-                            <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
-                              report.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                            }`}>
-                              {report.role}
-                            </span>
-                          </td>
-                        )}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center space-x-2">
-                            <button className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1.5 px-3 rounded-lg flex items-center transition-colors text-sm">
-                              <FontAwesomeIcon icon={faEye} className="mr-1.5" />
-                              View
-                            </button>
-                            {isAdmin && report.status === 'Pending' && (
-                              <>
-                                <button
-                                  onClick={() => handleApprove(report.report_id)}
-                                  disabled={updatingReports[report.report_id]}
-                                  className="bg-green-100 hover:bg-green-200 text-green-700 py-1.5 px-3 rounded-lg flex items-center transition-colors text-sm disabled:opacity-50"
-                                >
-                                  {updatingReports[report.report_id] ? (
-                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-700 mr-1.5"></div>
-                                  ) : (
-                                    <FontAwesomeIcon icon={faCheck} className="mr-1.5" />
-                                  )}
-                                  Approve
-                                </button>
-                                <button
-                                  onClick={() => handleReject(report.report_id)}
-                                  disabled={updatingReports[report.report_id]}
-                                  className="bg-red-100 hover:bg-red-200 text-red-700 py-1.5 px-3 rounded-lg flex items-center transition-colors text-sm disabled:opacity-50"
-                                >
-                                  {updatingReports[report.report_id] ? (
-                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-700 mr-1.5"></div>
-                                  ) : (
-                                    <FontAwesomeIcon icon={faXmark} className="mr-1.5" />
-                                  )}
-                                  Reject
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-            
-            {/* Mobile Card View */}
-            <div className="md:hidden">
-              {reports.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
-                  <div className="rounded-full bg-indigo-100 p-4 mx-auto w-16 h-16 flex items-center justify-center mb-4">
-                    <FontAwesomeIcon icon={faClipboardCheck} className="text-3xl text-indigo-400" />
-                  </div>
-                  <p className="text-lg font-medium text-gray-600">No reports found</p>
-                  <p className="text-sm mt-1 text-gray-500">Create your first report to get started!</p>
-                  <button 
-                    onClick={() => setActiveTab('add')}
-                    className="mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-2 px-4 rounded-lg flex items-center mx-auto"
-                  >
-                    <FontAwesomeIcon icon={faPlus} className="mr-2" />
-                    <span>Add New Report</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-200">
-                  {reports.map((report, index) => (
-                    <div key={report.id || index} className="p-4 hover:bg-indigo-50 transition-colors">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-1 rounded-lg">
-                          #{report.report_id}
-                        </span>
-                        {report.status === 'Approved' ? (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 flex items-center">
-                            <FontAwesomeIcon icon={faClipboardCheck} className="mr-1" />
-                            Approved
-                          </span>
-                        ) : report.status === 'Rejected' ? (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 flex items-center">
-                            <FontAwesomeIcon icon={faTimes} className="mr-1" />
-                            Rejected
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 flex items-center">
-                            <FontAwesomeIcon icon={faHourglassHalf} className="mr-1" />
-                            Pending
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center mb-2">
-                        <div className="bg-purple-100 rounded-full p-2 mr-2">
-                          <FontAwesomeIcon icon={faStore} className="text-purple-600" />
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-900">{report.dealer_name}</span>
-                          <span className="text-xs text-indigo-600 ml-2 bg-indigo-50 px-2 py-0.5 rounded">
-                            {report.dealer_type}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-start text-sm text-gray-600 mb-3 bg-blue-50 p-2 rounded-lg">
-                        <FontAwesomeIcon icon={faLocationDot} className="text-blue-500 mr-1.5 mt-0.5" />
-                        <span className="flex-1">
-                          {report.location}, {report.city}, {report.state}
-                        </span>
-                      </div>
-                      
-                      {isAdmin && (
-                        <div className="text-sm text-gray-600 mb-2 bg-gray-50 p-2 rounded-lg flex items-center">
-                          <FontAwesomeIcon icon={faUser} className="text-gray-500 mr-1.5" />
-                          <span className="font-medium">{report.username}</span>
-                          <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
-                            report.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {report.role}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {report.remarks && (
-                        <div className="text-sm text-gray-600 mb-3 bg-gray-50 p-2 rounded-lg flex items-start">
-                          <FontAwesomeIcon icon={faComment} className="text-gray-500 mr-1.5 mt-0.5" />
-                          <span className="flex-1 line-clamp-2">{report.remarks}</span>
-                        </div>
-                      )}
-                      
-                      {report.status === 'Rejected' && report.rejection_reason && (
-                        <div className="text-sm text-red-600 mb-3 bg-red-50 p-2 rounded-lg flex items-start">
-                          <FontAwesomeIcon icon={faExclamationTriangle} className="text-red-500 mr-1.5 mt-0.5" />
-                          <span className="flex-1">{report.rejection_reason}</span>
-                        </div>
-                      )}
-                      
-                      <div className="flex justify-between items-center mt-3">
-                        <button className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1.5 px-3 rounded-lg flex items-center transition-colors text-sm">
-                          <FontAwesomeIcon icon={faEye} className="mr-1.5" />
-                          View Details
-                        </button>
-                        
-                        {isAdmin && report.status === 'Pending' && (
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => handleApprove(report.report_id)}
-                              disabled={updatingReports[report.report_id]}
-                              className="bg-green-100 hover:bg-green-200 text-green-700 py-1.5 px-3 rounded-lg flex items-center transition-colors text-sm disabled:opacity-50"
-                            >
-                              {updatingReports[report.report_id] ? (
-                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-700 mr-1"></div>
-                              ) : (
-                                <FontAwesomeIcon icon={faCheck} className="mr-1" />
-                              )}
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleReject(report.report_id)}
-                              disabled={updatingReports[report.report_id]}
-                              className="bg-red-100 hover:bg-red-200 text-red-700 py-1.5 px-3 rounded-lg flex items-center transition-colors text-sm disabled:opacity-50"
-                            >
-                              {updatingReports[report.report_id] ? (
-                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-700 mr-1"></div>
-                              ) : (
-                                <FontAwesomeIcon icon={faXmark} className="mr-1" />
-                              )}
-                              Reject
-                            </button>
-                          </div>
-                        )}
-                      </div>
+      {activeTab !== 'view' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Reports Table Section */}
+          <div className={`lg:col-span-2 ${activeTab === 'reports' ? 'block' : 'hidden md:block'}`}>
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl relative">
+              <div className="p-5 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold flex items-center">
+                    <div className="bg-white bg-opacity-20 rounded-full p-2 mr-3">
+                      <FontAwesomeIcon icon={faClipboardCheck} />
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Add Report Form */}
-        <div className={`${activeTab === 'add' ? 'block' : 'hidden md:block'}`}>
-          <div className="bg-white p-6 rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl">
-            <div className="mb-6 flex items-center">
-              <div className="h-12 w-12 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center justify-center shadow-md mr-4">
-                <FontAwesomeIcon icon={faPlus} className="text-white text-lg" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-800">Add New Report</h3>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Dealer Information */}
-              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-xl mb-5">
-                <h4 className="text-sm uppercase font-semibold text-indigo-800 mb-3 border-b border-indigo-100 pb-2 flex items-center">
-                  <FontAwesomeIcon icon={faStoreAlt} className="mr-2" /> Dealer Information
-                </h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="dealer_name" className="block text-sm font-medium text-gray-700 mb-1">
-                      Dealer Name*
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <FontAwesomeIcon icon={faStore} className="text-indigo-500" />
-                      </div>
-                      <input
-                        type="text"
-                        id="dealer_name"
-                        name="dealer_name"
-                        value={formData.dealer_name}
-                        onChange={handleChange}
-                        required
-                        placeholder="Enter dealer name"
-                        className="pl-10 w-full px-4 py-3 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white shadow-sm"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="dealer_type" className="block text-sm font-medium text-gray-700 mb-1">
-                      Dealer Type*
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <FontAwesomeIcon icon={faChartLine} className="text-indigo-500" />
-                      </div>
-                      <select
-                        id="dealer_type"
-                        name="dealer_type"
-                        value={formData.dealer_type}
-                        onChange={handleChange}
-                        className="pl-10 w-full px-4 py-3 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 appearance-none bg-white shadow-sm"
-                      >
-                        <option value="0-1L">0-1L</option>
-                        <option value="1L-2.5L">1L-2.5L</option>
-                        <option value="2.5L above">2.5L above</option>
-                      </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <svg className="h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    </div>
+                    Recent Reports
+                  </h3>
+                  <div className="hidden md:flex items-center bg-white bg-opacity-20 rounded-full px-3 py-1">
+                    <FontAwesomeIcon icon={faFilter} className="mr-2" />
+                    <span className="text-sm">{reports.length} Reports</span>
                   </div>
                 </div>
               </div>
               
-              {/* Location Information */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl mb-5">
-                <h4 className="text-sm uppercase font-semibold text-blue-800 mb-3 border-b border-blue-100 pb-2 flex items-center">
-                  <FontAwesomeIcon icon={faLocationDot} className="mr-2" /> Location Details
-                </h4>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
-                      State*
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <FontAwesomeIcon icon={faMapMarkerAlt} className="text-blue-500" />
-                      </div>
-                      <select
-                        id="state"
-                        name="state"
-                        value={formData.state}
-                        onChange={handleChange}
-                        required
-                        className="pl-10 w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 appearance-none bg-white shadow-sm"
-                      >
-                        <option value="">Select State</option>
-                        {states.map(state => (
-                          <option key={state} value={state}>{state}</option>
-                        ))}
-                      </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <svg className="h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </div>
+              {/* Desktop/Tablet Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gradient-to-r from-indigo-50 to-purple-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <FontAwesomeIcon icon={faFileAlt} className="mr-2" /> Report
+                        </div>
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <FontAwesomeIcon icon={faStore} className="mr-2" /> Dealer
+                        </div>
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <FontAwesomeIcon icon={faLocationDot} className="mr-2" /> Location
+                        </div>
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <FontAwesomeIcon icon={faClipboardCheck} className="mr-2" /> Status
+                        </div>
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <FontAwesomeIcon icon={faEye} className="mr-2" /> Action
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {reports.length === 0 ? (
+                      <tr>
+                        <td colSpan="5" className="px-6 py-10 text-center text-gray-500">
+                          <div className="flex flex-col items-center justify-center">
+                            <div className="rounded-full bg-indigo-100 p-4 mb-4">
+                              <FontAwesomeIcon icon={faClipboardCheck} className="text-4xl text-indigo-400" />
+                            </div>
+                            <p className="text-lg font-medium text-gray-600">No reports found</p>
+                            <p className="text-sm mt-1 text-gray-500">Create your first report to get started!</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      reports.map((report, index) => (
+                        <tr key={report.id || index} className="hover:bg-indigo-50 transition-colors duration-150">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-1.5 rounded-lg">
+                              #{report.report_id}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex flex-col">
+                              <span className="font-medium text-gray-900">{report.dealer_name}</span>
+                              <span className="text-xs text-indigo-600 mt-1 bg-indigo-50 px-2 py-0.5 rounded w-fit">
+                                {report.dealer_type}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                            <div className="flex items-start max-w-xs">
+                              <FontAwesomeIcon icon={faLocationDot} className="mr-2 text-indigo-400 mt-1" />
+                              <span className="truncate">
+                                {report.location}, {report.city}, {report.state}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {report.status === 'Approved' ? (
+                              <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-green-100 text-green-800 flex items-center w-fit">
+                                <FontAwesomeIcon icon={faClipboardCheck} className="mr-1.5" />
+                                Approved
+                              </span>
+                            ) : report.status === 'Rejected' ? (
+                              <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-red-100 text-red-800 flex items-center w-fit">
+                                <FontAwesomeIcon icon={faTimes} className="mr-1.5" />
+                                Rejected
+                              </span>
+                            ) : (
+                              <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 flex items-center w-fit">
+                                <FontAwesomeIcon icon={faHourglassHalf} className="mr-1.5" />
+                                Pending
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button 
+                              onClick={() => handleViewReport(report)}
+                              disabled={viewLoading}
+                              className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1.5 px-3 rounded-lg flex items-center transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <FontAwesomeIcon icon={faEye} className="mr-1.5" />
+                              View Details
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Mobile Card View */}
+              <div className="md:hidden">
+                {reports.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500">
+                    <div className="rounded-full bg-indigo-100 p-4 mx-auto w-16 h-16 flex items-center justify-center mb-4">
+                      <FontAwesomeIcon icon={faClipboardCheck} className="text-3xl text-indigo-400" />
                     </div>
+                    <p className="text-lg font-medium text-gray-600">No reports found</p>
+                    <p className="text-sm mt-1 text-gray-500">Create your first report to get started!</p>
+                    <button 
+                      onClick={() => setActiveTab('add')}
+                      className="mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-2 px-4 rounded-lg flex items-center mx-auto"
+                    >
+                      <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                      <span>Add New Report</span>
+                    </button>
                   </div>
+                ) : (
+                  <div className="divide-y divide-gray-200">
+                    {reports.map((report, index) => (
+                      <div key={report.id || index} className="p-4 hover:bg-indigo-50 transition-colors">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-1 rounded-lg">
+                            #{report.report_id}
+                          </span>
+                          {report.status === 'Approved' ? (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 flex items-center">
+                              <FontAwesomeIcon icon={faClipboardCheck} className="mr-1" />
+                              Approved
+                            </span>
+                          ) : report.status === 'Rejected' ? (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 flex items-center">
+                              <FontAwesomeIcon icon={faTimes} className="mr-1" />
+                              Rejected
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 flex items-center">
+                              <FontAwesomeIcon icon={faHourglassHalf} className="mr-1" />
+                              Pending
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center mb-2">
+                          <div className="bg-purple-100 rounded-full p-2 mr-2">
+                            <FontAwesomeIcon icon={faStore} className="text-purple-600" />
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-900">{report.dealer_name}</span>
+                            <span className="text-xs text-indigo-600 ml-2 bg-indigo-50 px-2 py-0.5 rounded">
+                              {report.dealer_type}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start text-sm text-gray-600 mb-3 bg-blue-50 p-2 rounded-lg">
+                          <FontAwesomeIcon icon={faLocationDot} className="text-blue-500 mr-1.5 mt-0.5" />
+                          <span className="flex-1">
+                            {report.location}, {report.city}, {report.state}
+                          </span>
+                        </div>
+                        
+                        {report.remarks && (
+                          <div className="text-sm text-gray-600 mb-3 bg-gray-50 p-2 rounded-lg flex items-start">
+                            <FontAwesomeIcon icon={faComment} className="text-gray-500 mr-1.5 mt-0.5" />
+                            <span className="flex-1 line-clamp-2">{report.remarks}</span>
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-end mt-2">
+                          <button 
+                            onClick={() => handleViewReport(report)}
+                            disabled={viewLoading}
+                            className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1.5 px-3 rounded-lg flex items-center transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <FontAwesomeIcon icon={faEye} className="mr-1.5" />
+                            View Details
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Add Report Form */}
+          <div className={`${activeTab === 'add' ? 'block' : 'hidden md:block'}`}>
+            <div className="bg-white p-6 rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl">
+              <div className="mb-6 flex items-center">
+                <div className="h-12 w-12 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center justify-center shadow-md mr-4">
+                  <FontAwesomeIcon icon={faPlus} className="text-white text-lg" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800">Add New Report</h3>
+              </div>
+              
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Dealer Information */}
+                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-xl mb-5">
+                  <h4 className="text-sm uppercase font-semibold text-indigo-800 mb-3 border-b border-indigo-100 pb-2 flex items-center">
+                    <FontAwesomeIcon icon={faStoreAlt} className="mr-2" /> Dealer Information
+                  </h4>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
-                        City*
+                      <label htmlFor="dealer_name" className="block text-sm font-medium text-gray-700 mb-1">
+                        Dealer Name*
                       </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <FontAwesomeIcon icon={faCity} className="text-blue-500" />
+                          <FontAwesomeIcon icon={faStore} className="text-indigo-500" />
                         </div>
-                        <select
-                          id="city"
-                          name="city"
-                          value={formData.city}
+                        <input
+                          type="text"
+                          id="dealer_name"
+                          name="dealer_name"
+                          value={formData.dealer_name}
                           onChange={handleChange}
                           required
-                          disabled={!formData.state}
-                          className={`pl-10 w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 appearance-none shadow-sm ${
-                            !formData.state ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
-                          }`}
+                          placeholder="Enter dealer name"
+                          className="pl-10 w-full px-4 py-3 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white shadow-sm"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="dealer_type" className="block text-sm font-medium text-gray-700 mb-1">
+                        Dealer Type*
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <FontAwesomeIcon icon={faChartLine} className="text-indigo-500" />
+                        </div>
+                        <select
+                          id="dealer_type"
+                          name="dealer_type"
+                          value={formData.dealer_type}
+                          onChange={handleChange}
+                          className="pl-10 w-full px-4 py-3 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 appearance-none bg-white shadow-sm"
                         >
-                          <option value="">Select City</option>
-                          {cities.map(city => (
-                            <option key={city} value={city}>{city}</option>
+                          <option value="0-1L">0-1L</option>
+                          <option value="1L-2.5L">1L-2.5L</option>
+                          <option value="2.5L above">2.5L above</option>
+                        </select>
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <svg className="h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Location Information */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl mb-5">
+                  <h4 className="text-sm uppercase font-semibold text-blue-800 mb-3 border-b border-blue-100 pb-2 flex items-center">
+                    <FontAwesomeIcon icon={faLocationDot} className="mr-2" /> Location Details
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
+                        State*
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <FontAwesomeIcon icon={faMapMarkerAlt} className="text-blue-500" />
+                        </div>
+                        <select
+                          id="state"
+                          name="state"
+                          value={formData.state}
+                          onChange={handleChange}
+                          required
+                          className="pl-10 w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 appearance-none bg-white shadow-sm"
+                        >
+                          <option value="">Select State</option>
+                          {states.map(state => (
+                            <option key={state} value={state}>{state}</option>
                           ))}
                         </select>
                         <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
@@ -928,125 +965,159 @@ const Reports = () => {
                       </div>
                     </div>
                     
-                    <div>
-                      <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
-                        Location*
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <FontAwesomeIcon icon={faLocationDot} className="text-blue-500" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                          City*
+                        </label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <FontAwesomeIcon icon={faCity} className="text-blue-500" />
+                          </div>
+                          <select
+                            id="city"
+                            name="city"
+                            value={formData.city}
+                            onChange={handleChange}
+                            required
+                            disabled={!formData.state}
+                            className={`pl-10 w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 appearance-none shadow-sm ${
+                              !formData.state ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                            }`}
+                          >
+                            <option value="">Select City</option>
+                            {cities.map(city => (
+                              <option key={city} value={city}>{city}</option>
+                            ))}
+                          </select>
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <svg className="h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </div>
                         </div>
-                        <select
-                          id="location"
-                          name="location"
-                          value={formData.location}
-                          onChange={handleChange}
-                          required
-                          disabled={!formData.city}
-                          className={`pl-10 w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 appearance-none shadow-sm ${
-                            !formData.city ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                        >
-                          <option value="">Select Location</option>
-                          {locations.map(location => (
-                            <option key={location} value={location}>{location}</option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <svg className="h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
+                          Location*
+                        </label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <FontAwesomeIcon icon={faLocationDot} className="text-blue-500" />
+                          </div>
+                          <select
+                            id="location"
+                            name="location"
+                            value={formData.location}
+                            onChange={handleChange}
+                            required
+                            disabled={!formData.city}
+                            className={`pl-10 w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 appearance-none shadow-sm ${
+                              !formData.city ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                            }`}
+                          >
+                            <option value="">Select Location</option>
+                            {locations.map(location => (
+                              <option key={location} value={location}>{location}</option>
+                            ))}
+                          </select>
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <svg className="h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              
-              {/* Additional Information */}
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-xl">
-                <h4 className="text-sm uppercase font-semibold text-purple-800 mb-3 border-b border-purple-100 pb-2 flex items-center">
-                  <FontAwesomeIcon icon={faComment} className="mr-2" /> Additional Information
-                </h4>
                 
-                <div>
-                  <label htmlFor="remarks" className="block text-sm font-medium text-gray-700 mb-1">
-                    Remarks
-                  </label>
-                  <div className="relative">
-                    <div className="absolute top-3 left-3 flex items-start pointer-events-none">
-                      <FontAwesomeIcon icon={faComment} className="text-purple-500" />
+                {/* Additional Information */}
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-xl">
+                  <h4 className="text-sm uppercase font-semibold text-purple-800 mb-3 border-b border-purple-100 pb-2 flex items-center">
+                    <FontAwesomeIcon icon={faComment} className="mr-2" /> Additional Information
+                  </h4>
+                  
+                  <div>
+                    <label htmlFor="remarks" className="block text-sm font-medium text-gray-700 mb-1">
+                      Remarks
+                    </label>
+                    <div className="relative">
+                      <div className="absolute top-3 left-3 flex items-start pointer-events-none">
+                        <FontAwesomeIcon icon={faComment} className="text-purple-500" />
+                      </div>
+                      <textarea
+                        id="remarks"
+                        name="remarks"
+                        value={formData.remarks}
+                        onChange={handleChange}
+                        rows={4}
+                        placeholder="Enter any additional remarks here..."
+                        className="pl-10 w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 bg-white shadow-sm"
+                      />
                     </div>
-                    <textarea
-                      id="remarks"
-                      name="remarks"
-                      value={formData.remarks}
-                      onChange={handleChange}
-                      rows={4}
-                      placeholder="Enter any additional remarks here..."
-                      className="pl-10 w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 bg-white shadow-sm"
-                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      <FontAwesomeIcon icon={faUser} className="mr-1" />
+                      Include any relevant details about the dealer visit
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    <FontAwesomeIcon icon={faUser} className="mr-1" />
-                    Include any relevant details about the dealer visit
-                  </p>
                 </div>
-              </div>
-              
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full mt-6 px-6 py-4 text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-xl font-medium transform transition-all duration-300 hover:scale-[1.01] hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center"
-              >
-                {submitting ? (
-                  <span className="flex items-center justify-center">
-                    <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Submitting Report...
-                  </span>
-                ) : (
-                  <span className="flex items-center justify-center text-lg">
-                    <FontAwesomeIcon icon={faPlus} className="mr-2" />
-                    Submit Report
-                  </span>
-                )}
-              </button>
-            </form>
-          </div>
-          
-          {/* Tips Card - Desktop Only */}
-          <div className="hidden lg:block mt-6 bg-white p-5 rounded-xl shadow-lg border-l-4 border-yellow-500">
-            <h4 className="text-lg font-semibold text-gray-800 mb-2 flex items-center">
-              <FontAwesomeIcon icon={faExclamationTriangle} className="text-yellow-500 mr-2" />
-              Tips for Dealer Reports
-            </h4>
-            <ul className="space-y-2 text-sm text-gray-600">
-              <li className="flex items-start">
-                <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
-                  <span className="text-xs font-bold text-indigo-600">1</span>
-                </div>
-                <span>Always verify dealer details before submitting your report</span>
-              </li>
-              <li className="flex items-start">
-                <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
-                  <span className="text-xs font-bold text-indigo-600">2</span>
-                </div>
-                <span>Include specific details in remarks for better tracking</span>
-              </li>
-              <li className="flex items-start">
-                <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
-                  <span className="text-xs font-bold text-indigo-600">3</span>
-                </div>
-                <span>Submit reports promptly after dealer visits</span>
-              </li>
-            </ul>
+                
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full mt-6 px-6 py-4 text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-xl font-medium transform transition-all duration-300 hover:scale-[1.01] hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center"
+                >
+                  {submitting ? (
+                    <span className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Submitting Report...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center text-lg">
+                      <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                      Submit Report
+                    </span>
+                  )}
+                </button>
+              </form>
+            </div>
+            
+            {/* Tips Card - Desktop Only */}
+            <div className="hidden lg:block mt-6 bg-white p-5 rounded-xl shadow-lg border-l-4 border-yellow-500">
+              <h4 className="text-lg font-semibold text-gray-800 mb-2 flex items-center">
+                <FontAwesomeIcon icon={faExclamationTriangle} className="text-yellow-500 mr-2" />
+                Tips for Dealer Reports
+              </h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li className="flex items-start">
+                  <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
+                    <span className="text-xs font-bold text-indigo-600">1</span>
+                  </div>
+                  <span>Always verify dealer details before submitting your report</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
+                    <span className="text-xs font-bold text-indigo-600">2</span>
+                  </div>
+                  <span>Include specific details in remarks for better tracking</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-0.5">
+                    <span className="text-xs font-bold text-indigo-600">3</span>
+                  </div>
+                  <span>Submit reports promptly after dealer visits</span>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
-      </div>
+      )}
       
       {/* Mobile Floating Action Button */}
       <div className="fixed bottom-6 right-6 md:hidden z-50">
