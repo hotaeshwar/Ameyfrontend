@@ -147,8 +147,8 @@ const Reports = () => {
         throw new Error('No authentication token found. Please login again.')
       }
 
-      const response = await fetch(`https://api.ameyaaccountsonline.info/daily-reports/${reportId}/status`, {
-        method: 'PATCH',
+      const response = await fetch(`https://api.ameyaaccountsonline.info/daily-report/update-status/${report.report_id`, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
