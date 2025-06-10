@@ -112,8 +112,8 @@ const Admin = () => {
       const token = localStorage.getItem('token')
       
       const endpoint = type === 'travel' 
-        ? `http://localhost:8000/update-status/${id}`
-        : `http://localhost:8000/update-status/${id}`
+        ? `https://api.ameyaaccountsonline.info/update-status/${id}`
+        : `https://api.ameyaaccountsonline.info/update-status/${id}`
 
       const formData = new FormData()
       formData.append('status', status)
