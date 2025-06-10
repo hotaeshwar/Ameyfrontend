@@ -148,11 +148,11 @@ const RegistrationPage = ({ onRegister }) => {
           
           {/* Logo and Header Inside Card */}
           <div className="text-center mb-6 sm:mb-8">
-            <div className="mx-auto w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full shadow-lg flex items-center justify-center mb-4 sm:mb-6 transform hover:scale-110 transition-transform duration-300 border-2 border-blue-100">
+            <div className="mx-auto w-32 h-32 sm:w-36 sm:h-36 md:w-40 md:h-40 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full shadow-lg flex items-center justify-center mb-4 sm:mb-6 transform hover:scale-110 transition-transform duration-300 border-2 border-blue-100">
               <img 
                 src={logo} 
                 alt="Amey Distribution Logo" 
-                className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 object-contain"
+                className="w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 object-contain"
               />
             </div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-2 tracking-wide">Join Us</h1>
