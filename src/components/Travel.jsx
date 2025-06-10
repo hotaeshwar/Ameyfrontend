@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 // API Base URL Configuration
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://api.ameyaaccountsonline.info';
 
 const Travel = () => {
   const [user, setUser] = useState(null);
