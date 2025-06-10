@@ -269,103 +269,301 @@ const Travel = () => {
   };
 
   // Generate PDF content using jsPDF (Client-side PDF generation)
-  const downloadPDF = () => {
-    try {
-      // Import jsPDF dynamically
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      script.onload = () => {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
+  // Enhanced PDF generation function with Amey Marketing and Distribution watermark
+const downloadPDF = () => {
+  try {
+    // Import jsPDF dynamically
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    script.onload = () => {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      
+      const currentDate = new Date();
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      
+      // Add watermark function
+      const addWatermark = (doc, pageNumber = 1) => {
+        // Save current graphics state
+        doc.saveGraphicsState();
         
-        const currentDate = new Date();
-        const year = currentDate.getFullYear();
-        const month = currentDate.getMonth() + 1;
+        // Set transparency
+        doc.setGState(doc.GState({opacity: 0.1}));
         
-        // Add title
-        doc.setFontSize(20);
-        doc.setTextColor(40, 40, 40);
-        doc.text('Travel Expense Report', 20, 30);
+        // Set watermark text properties
+        doc.setTextColor(128, 128, 128); // Gray color
+        doc.setFontSize(40);
+        doc.setFont(undefined, 'bold');
         
-        // Add date
-        doc.setFontSize(12);
-        doc.setTextColor(100, 100, 100);
-        doc.text(`Generated on: ${currentDate.toLocaleDateString()}`, 20, 45);
+        // Calculate center position for watermark
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
         
-        // Add summary
-        doc.setFontSize(14);
-        doc.setTextColor(40, 40, 40);
-        doc.text('Summary:', 20, 65);
+        // Rotate and position watermark diagonally
+        const centerX = pageWidth / 2;
+        const centerY = pageHeight / 2;
         
-        doc.setFontSize(11);
-        doc.text(`Total Entries: ${filteredEntries.length}`, 30, 75);
-        doc.text(`Approved: ${filteredEntries.filter(e => e.status === 'Approved').length}`, 30, 85);
-        doc.text(`Pending: ${filteredEntries.filter(e => e.status === 'Pending' || !e.status).length}`, 30, 95);
-        doc.text(`Total Amount: ₹${filteredEntries.reduce((sum, e) => sum + (Number(e.calculated_amount) || 0), 0).toFixed(2)}`, 30, 105);
-        
-        // Add table headers
-        let yPosition = 125;
-        doc.setFontSize(10);
-        doc.setTextColor(40, 40, 40);
-        doc.text('ID', 20, yPosition);
-        doc.text('Mode', 45, yPosition);
-        doc.text('From', 75, yPosition);
-        doc.text('To', 120, yPosition);
-        doc.text('Amount', 160, yPosition);
-        doc.text('Status', 185, yPosition);
-        
-        // Add line under headers
-        doc.line(20, yPosition + 2, 200, yPosition + 2);
-        yPosition += 10;
-        
-        // Add data rows
-        filteredEntries.slice(0, 25).forEach((entry, index) => { // Limit to 25 entries to fit on page
-          if (yPosition > 270) { // Check if we need a new page
-            doc.addPage();
-            yPosition = 30;
+        // Add diagonal watermark text
+        doc.text(
+          'AMEY MARKETING',
+          centerX,
+          centerY - 10,
+          {
+            angle: -45,
+            align: 'center'
           }
-          
-          doc.setFontSize(9);
-          doc.text(entry.travel_id || '', 20, yPosition);
-          doc.text(entry.travel_mode || '', 45, yPosition);
-          
-          const fromText = ['Bus', 'Train', 'Flight'].includes(entry.travel_mode) 
-            ? (entry.from_station || '').substring(0, 15)
-            : `${entry.from_city || ''}`.substring(0, 15);
-          doc.text(fromText, 75, yPosition);
-          
-          const toText = ['Bus', 'Train', 'Flight'].includes(entry.travel_mode)
-            ? (entry.to_station || '').substring(0, 15)
-            : `${entry.to_city || ''}`.substring(0, 15);
-          doc.text(toText, 120, yPosition);
-          
-          doc.text(`₹${Number(entry.calculated_amount || 0).toFixed(2)}`, 160, yPosition);
-          doc.text(entry.status || 'Pending', 185, yPosition);
-          
-          yPosition += 8;
-        });
+        );
         
-        if (filteredEntries.length > 25) {
-          doc.text(`... and ${filteredEntries.length - 25} more entries`, 20, yPosition + 10);
+        doc.text(
+          '& DISTRIBUTION',
+          centerX,
+          centerY + 10,
+          {
+            angle: -45,
+            align: 'center'
+          }
+        );
+        
+        // Add smaller watermark at bottom right
+        doc.setFontSize(12);
+        doc.setGState(doc.GState({opacity: 0.3}));
+        doc.text(
+          'Amey Marketing & Distribution',
+          pageWidth - 20,
+          pageHeight - 10,
+          {
+            align: 'right'
+          }
+        );
+        
+        // Restore graphics state
+        doc.restoreGraphicsState();
+      };
+      
+      // Add watermark to first page
+      addWatermark(doc, 1);
+      
+      // Company Header with Logo placeholder
+      doc.setFillColor(41, 98, 183); // Blue background
+      doc.rect(0, 0, doc.internal.pageSize.getWidth(), 50, 'F');
+      
+      // Company name in header
+      doc.setTextColor(255, 255, 255); // White text
+      doc.setFontSize(24);
+      doc.setFont(undefined, 'bold');
+      doc.text('AMEY MARKETING & DISTRIBUTION', 20, 25);
+      
+      // Subtitle
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'normal');
+      doc.text('Travel Expense Management System', 20, 35);
+      
+      // Reset text color for content
+      doc.setTextColor(40, 40, 40);
+      
+      // Add title
+      doc.setFontSize(20);
+      doc.setFont(undefined, 'bold');
+      doc.text('Travel Expense Report', 20, 70);
+      
+      // Add date and report info
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Generated on: ${currentDate.toLocaleDateString()}`, 20, 85);
+      doc.text(`Report Period: ${month.toString().padStart(2, '0')}/${year}`, 20, 95);
+      doc.text(`Generated by: ${user?.username || 'System'}`, 20, 105);
+      
+      // Add summary section with better styling
+      doc.setFontSize(16);
+      doc.setTextColor(40, 40, 40);
+      doc.setFont(undefined, 'bold');
+      doc.text('Executive Summary', 20, 125);
+      
+      // Summary box
+      doc.setDrawColor(200, 200, 200);
+      doc.setFillColor(248, 249, 250);
+      doc.roundedRect(20, 135, 170, 45, 3, 3, 'FD');
+      
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(60, 60, 60);
+      
+      const totalEntries = filteredEntries.length;
+      const approvedEntries = filteredEntries.filter(e => e.status === 'Approved').length;
+      const pendingEntries = filteredEntries.filter(e => e.status === 'Pending' || !e.status).length;
+      const rejectedEntries = filteredEntries.filter(e => e.status === 'Rejected').length;
+      const totalAmount = filteredEntries.reduce((sum, e) => sum + (Number(e.calculated_amount) || 0), 0);
+      
+      doc.text(`Total Travel Entries: ${totalEntries}`, 30, 150);
+      doc.text(`Approved Entries: ${approvedEntries}`, 30, 160);
+      doc.text(`Pending Entries: ${pendingEntries}`, 120, 150);
+      doc.text(`Rejected Entries: ${rejectedEntries}`, 120, 160);
+      doc.text(`Total Amount: ₹${totalAmount.toFixed(2)}`, 30, 170);
+      
+      // Add detailed table headers
+      let yPosition = 200;
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(40, 40, 40);
+      doc.text('Detailed Travel Records', 20, yPosition);
+      
+      yPosition += 15;
+      
+      // Table header background
+      doc.setFillColor(240, 240, 240);
+      doc.rect(20, yPosition - 5, 170, 12, 'F');
+      
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(40, 40, 40);
+      doc.text('ID', 25, yPosition);
+      doc.text('Mode', 45, yPosition);
+      doc.text('From', 70, yPosition);
+      doc.text('To', 110, yPosition);
+      doc.text('Amount', 145, yPosition);
+      doc.text('Status', 170, yPosition);
+      
+      // Add line under headers
+      doc.setDrawColor(180, 180, 180);
+      doc.line(20, yPosition + 2, 190, yPosition + 2);
+      yPosition += 10;
+      
+      // Add data rows with alternating colors
+      const maxEntriesPerPage = 25;
+      const entriesToShow = filteredEntries.slice(0, maxEntriesPerPage);
+      
+      entriesToShow.forEach((entry, index) => {
+        if (yPosition > 270) { // Check if we need a new page
+          doc.addPage();
+          addWatermark(doc, 2); // Add watermark to new page
+          yPosition = 30;
+          
+          // Repeat headers on new page
+          doc.setFillColor(240, 240, 240);
+          doc.rect(20, yPosition - 5, 170, 12, 'F');
+          doc.setFontSize(9);
+          doc.setFont(undefined, 'bold');
+          doc.text('ID', 25, yPosition);
+          doc.text('Mode', 45, yPosition);
+          doc.text('From', 70, yPosition);
+          doc.text('To', 110, yPosition);
+          doc.text('Amount', 145, yPosition);
+          doc.text('Status', 170, yPosition);
+          doc.line(20, yPosition + 2, 190, yPosition + 2);
+          yPosition += 10;
         }
         
-        // Save the PDF
-        doc.save(`travel-report-${year}-${month.toString().padStart(2, '0')}.pdf`);
+        // Alternating row colors
+        if (index % 2 === 0) {
+          doc.setFillColor(252, 252, 252);
+          doc.rect(20, yPosition - 4, 170, 8, 'F');
+        }
         
-        setSuccessMessage('PDF report downloaded successfully!');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      };
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(60, 60, 60);
+        
+        // Travel ID
+        const travelId = (entry.travel_id || '').substring(0, 8);
+        doc.text(travelId, 25, yPosition);
+        
+        // Travel Mode
+        const mode = (entry.travel_mode || '').substring(0, 8);
+        doc.text(mode, 45, yPosition);
+        
+        // From location
+        const fromText = ['Bus', 'Train', 'Flight'].includes(entry.travel_mode) 
+          ? (entry.from_station || '').substring(0, 15)
+          : `${entry.from_city || ''}`.substring(0, 15);
+        doc.text(fromText, 70, yPosition);
+        
+        // To location
+        const toText = ['Bus', 'Train', 'Flight'].includes(entry.travel_mode)
+          ? (entry.to_station || '').substring(0, 15)
+          : `${entry.to_city || ''}`.substring(0, 15);
+        doc.text(toText, 110, yPosition);
+        
+        // Amount
+        doc.text(`₹${Number(entry.calculated_amount || 0).toFixed(2)}`, 145, yPosition);
+        
+        // Status with color coding
+        const status = entry.status || 'Pending';
+        if (status === 'Approved') {
+          doc.setTextColor(34, 197, 94); // Green
+        } else if (status === 'Rejected') {
+          doc.setTextColor(239, 68, 68); // Red
+        } else {
+          doc.setTextColor(245, 158, 11); // Yellow/Orange
+        }
+        doc.text(status, 170, yPosition);
+        doc.setTextColor(60, 60, 60); // Reset color
+        
+        yPosition += 8;
+      });
       
-      script.onerror = () => {
-        setErrors({ general: 'Failed to load PDF library. Please try again.' });
-      };
+      // Add footer information
+      if (filteredEntries.length > maxEntriesPerPage) {
+        yPosition += 10;
+        doc.setFontSize(9);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`... and ${filteredEntries.length - maxEntriesPerPage} more entries`, 25, yPosition);
+        doc.text('Please contact admin for complete detailed report', 25, yPosition + 10);
+      }
       
-      document.head.appendChild(script);
-    } catch (error) {
-      setErrors({ general: 'Error downloading PDF report' });
+      // Add footer with company info
+      const pageHeight = doc.internal.pageSize.getHeight();
+      doc.setDrawColor(200, 200, 200);
+      doc.line(20, pageHeight - 25, 190, pageHeight - 25);
+      
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
+      doc.text('Amey Marketing & Distribution - Travel Management System', 20, pageHeight - 15);
+      doc.text(`Page 1 of ${doc.getNumberOfPages()} | Generated: ${currentDate.toLocaleString()}`, 20, pageHeight - 8);
+      
+      // Add page numbers to all pages
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(120, 120, 120);
+        doc.text(
+          `${i} / ${pageCount}`,
+          doc.internal.pageSize.getWidth() - 20,
+          doc.internal.pageSize.getHeight() - 8,
+          { align: 'right' }
+        );
+      }
+      
+      // Generate filename with timestamp
+      const timestamp = currentDate.toISOString().slice(0, 10);
+      const filename = `Amey_Travel_Report_${timestamp}_${year}-${month.toString().padStart(2, '0')}.pdf`;
+      
+      // Save the PDF
+      doc.save(filename);
+      
+      setSuccessMessage('PDF report with company watermark downloaded successfully!');
+      setTimeout(() => setSuccessMessage(''), 4000);
+    };
+    
+    script.onerror = () => {
+      setErrors({ general: 'Failed to load PDF library. Please check your internet connection and try again.' });
+      setTimeout(() => setErrors({}), 5000);
+    };
+    
+    // Remove any existing script to avoid conflicts
+    const existingScript = document.querySelector('script[src*="jspdf"]');
+    if (existingScript) {
+      existingScript.remove();
     }
-  };
-
+    
+    document.head.appendChild(script);
+  } catch (error) {
+    console.error('PDF Generation Error:', error);
+    setErrors({ general: 'Error generating PDF report. Please try again.' });
+    setTimeout(() => setErrors({}), 5000);
+  }
+};
   // Handle view ticket - show ticket if exists, or show message if not uploaded
   const handleViewTicket = async (entry) => {
     try {
