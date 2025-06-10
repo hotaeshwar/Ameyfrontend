@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react'
 
 // API Configuration - Update this to match your environment
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://api.ameyaaccountsonline.info' 
-  : 'http://localhost:8000'
+const API_BASE_URL = 'https://api.ameyaaccountsonline.info'
 
 const Dashboard = () => {
   const [stats, setStats] = useState(null)
