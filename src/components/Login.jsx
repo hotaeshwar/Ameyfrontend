@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import logo from '../assets/images/AMEY-DISTRIBUTION.png';
 
 // API Base URL Configuration
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://api.ameyaaccountsonline.info';
 
 const LoginPage = ({ onLogin }) => {
   const [formData, setFormData] = useState({
