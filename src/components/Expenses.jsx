@@ -1,4 +1,18 @@
 import { useState, useEffect } from 'react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+  faDollarSign,
+  faPlus,
+  faChartBar,
+  faDownload,
+  faExclamationTriangle,
+  faCheckCircle,
+  faSpinner,
+  faCircle,
+  faRupeeSign,
+  faMoneyBillWave,
+  faCalendarAlt
+} from '@fortawesome/free-solid-svg-icons'
 
 const Expenses = () => {
   const [expenses, setExpenses] = useState([])
@@ -20,9 +34,9 @@ const Expenses = () => {
     try {
       setLoading(true)
       setError('')
-      const token = localStorage.getItem('token')
+      const token = localStorage.getItem('access_token')
       
-      const response = await fetch('https://api.ameyaaccountsonline.info/expenses/my', {
+      const response = await fetch('http://localhost:8000/expenses/my', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -66,9 +80,9 @@ const Expenses = () => {
     try {
       setLoading(true)
       setError('')
-      const token = localStorage.getItem('token')
+      const token = localStorage.getItem('access_token')
       
-      const response = await fetch('https://api.ameyaaccountsonline.info/expenses', {
+      const response = await fetch('http://localhost:8000/expenses', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -89,7 +103,7 @@ const Expenses = () => {
       setExpenses([data.data, ...expenses])
       setFormData({
         amount: '',
-        category: 'Marketing',
+        category: 'Marketing', 
         description: ''
       })
       setSuccess('Expense added successfully!')
@@ -117,6 +131,133 @@ const Expenses = () => {
     }
   }
 
+  // Download functionality - PDF instead of CSV
+  const downloadExpenses = () => {
+    if (expenses.length === 0) {
+      setError('No expenses to download')
+      setTimeout(() => setError(''), 3000)
+      return
+    }
+
+    try {
+      // Create PDF content using jsPDF (we'll use a simple HTML to PDF approach)
+      const printWindow = window.open('', '', 'height=600,width=800')
+      
+      const totalAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0)
+      
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Expense Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #4F46E5; padding-bottom: 20px; }
+            .company-name { color: #4F46E5; font-size: 24px; font-weight: bold; margin-bottom: 5px; }
+            .report-title { font-size: 18px; color: #666; }
+            .summary { background: #F8FAFC; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+            .summary-item { display: inline-block; margin-right: 30px; }
+            .summary-label { font-weight: bold; color: #374151; }
+            .summary-value { color: #059669; font-size: 18px; font-weight: bold; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #E5E7EB; padding: 12px; text-align: left; }
+            th { background: #F9FAFB; font-weight: bold; color: #374151; }
+            tr:nth-child(even) { background: #F9FAFB; }
+            .amount { color: #059669; font-weight: bold; }
+            .category { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+            .marketing { background: #EDE9FE; color: #7C3AED; }
+            .travel { background: #DBEAFE; color: #2563EB; }
+            .food { background: #FEF3C7; color: #D97706; }
+            .health { background: #D1FAE5; color: #059669; }
+            .other { background: #F3F4F6; color: #374151; }
+            .footer { margin-top: 30px; text-align: center; color: #6B7280; font-size: 12px; border-top: 1px solid #E5E7EB; padding-top: 20px; }
+            @media print {
+              body { margin: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="company-name">Amey Distribution</div>
+            <div class="report-title">Expense Report</div>
+            <div style="color: #6B7280; font-size: 14px; margin-top: 10px;">Generated on ${new Date().toLocaleDateString()}</div>
+          </div>
+          
+          <div class="summary">
+            <div class="summary-item">
+              <div class="summary-label">Total Expenses:</div>
+              <div class="summary-value">₹${totalAmount.toFixed(2)}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Number of Entries:</div>
+              <div class="summary-value">${expenses.length}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Period:</div>
+              <div class="summary-value">All Time</div>
+            </div>
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Invoice ID</th>
+                <th>Amount</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${expenses.map(expense => {
+                let categoryClass = 'other'
+                if (expense.category === 'Marketing') categoryClass = 'marketing'
+                if (expense.category === 'Travel') categoryClass = 'travel'
+                if (expense.category === 'Food') categoryClass = 'food'
+                if (expense.category === 'Health') categoryClass = 'health'
+                
+                return `
+                  <tr>
+                    <td>${expense.invoice_id}</td>
+                    <td class="amount">₹${expense.amount.toFixed(2)}</td>
+                    <td><span class="category ${categoryClass}">${expense.category}</span></td>
+                    <td>${expense.description || 'N/A'}</td>
+                    <td>${new Date(expense.date_created).toLocaleDateString()}</td>
+                  </tr>
+                `
+              }).join('')}
+            </tbody>
+          </table>
+          
+          <div class="footer">
+            <div>This report was generated automatically by TrackExpense system.</div>
+            <div style="margin-top: 5px;">© ${new Date().getFullYear()} Amey Distribution. All rights reserved.</div>
+          </div>
+          
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() {
+                window.close();
+              }, 1000);
+            }
+          </script>
+        </body>
+        </html>
+      `
+      
+      printWindow.document.write(htmlContent)
+      printWindow.document.close()
+      
+      setSuccess('PDF download initiated!')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err) {
+      setError('Failed to generate PDF')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
   if (loading && expenses.length === 0) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -131,20 +272,32 @@ const Expenses = () => {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
       <div className="max-w-7xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800 flex items-center">
-          <span className="bg-blue-500 rounded-full w-8 h-8 flex items-center justify-center mr-2">
-            <span className="text-white text-sm">₹</span>
-          </span>
-          Expense Tracker
-          <span className="ml-2 text-blue-500 text-lg">
-            <span className="hidden sm:inline">| Manage Your Finances</span>
-          </span>
-        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center mb-4 sm:mb-0">
+            <span className="bg-blue-500 rounded-full w-8 h-8 flex items-center justify-center mr-2">
+              <FontAwesomeIcon icon={faRupeeSign} className="text-white text-sm" />
+            </span>
+            Expense Tracker
+            <span className="ml-2 text-blue-500 text-lg">
+              <span className="hidden sm:inline">| Manage Your Finances</span>
+            </span>
+          </h2>
+          
+          {expenses.length > 0 && (
+            <button
+              onClick={downloadExpenses}
+              className="flex items-center px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-medium rounded-md shadow-sm transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
+            >
+              <FontAwesomeIcon icon={faDownload} className="mr-2" />
+              Download PDF
+            </button>
+          )}
+        </div>
         
         {error && (
           <div className="p-4 mb-6 text-red-700 bg-red-100 rounded-lg border-l-4 border-red-500 animate-pulse">
             <p className="font-bold flex items-center">
-              <span className="inline-block w-5 h-5 mr-2 rounded-full bg-red-500 flex-shrink-0"></span>
+              <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2 text-red-500" />
               Error:
             </p>
             <p>{error}</p>
@@ -154,7 +307,7 @@ const Expenses = () => {
         {success && (
           <div className="p-4 mb-6 text-green-700 bg-green-100 rounded-lg border-l-4 border-green-500 animate-pulse">
             <p className="flex items-center">
-              <span className="inline-block w-5 h-5 mr-2 rounded-full bg-green-500 flex-shrink-0"></span>
+              <FontAwesomeIcon icon={faCheckCircle} className="mr-2 text-green-500" />
               {success}
             </p>
           </div>
@@ -165,14 +318,14 @@ const Expenses = () => {
             <div className="bg-white rounded-lg shadow-lg overflow-hidden transform transition-all duration-200 hover:shadow-xl">
               <div className="px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white">
                 <h3 className="text-xl font-bold">
-                  <span className="mr-2">💰</span>
+                  <FontAwesomeIcon icon={faMoneyBillWave} className="mr-2" />
                   Your Expenses
                 </h3>
               </div>
               {expenses.length === 0 ? (
                 <div className="p-8 text-center">
                   <div className="inline-block rounded-full bg-blue-100 p-3 mb-4">
-                    <span className="text-blue-500 text-2xl">📊</span>
+                    <FontAwesomeIcon icon={faChartBar} className="text-blue-500 text-2xl" />
                   </div>
                   <p className="text-gray-500 font-medium">No expenses found. Add your first expense.</p>
                 </div>
@@ -183,25 +336,25 @@ const Expenses = () => {
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           <span className="flex items-center">
-                            <span className="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
+                            <FontAwesomeIcon icon={faCircle} className="text-gray-400 text-xs mr-2" />
                             Invoice ID
                           </span>
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           <span className="flex items-center">
-                            <span className="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+                            <FontAwesomeIcon icon={faCircle} className="text-green-400 text-xs mr-2" />
                             Amount
                           </span>
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           <span className="flex items-center">
-                            <span className="w-2 h-2 bg-blue-400 rounded-full mr-2"></span>
+                            <FontAwesomeIcon icon={faCircle} className="text-blue-400 text-xs mr-2" />
                             Category
                           </span>
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           <span className="flex items-center">
-                            <span className="w-2 h-2 bg-purple-400 rounded-full mr-2"></span>
+                            <FontAwesomeIcon icon={faCircle} className="text-purple-400 text-xs mr-2" />
                             Date
                           </span>
                         </th>
@@ -252,7 +405,7 @@ const Expenses = () => {
           <div className="bg-white rounded-lg shadow-lg overflow-hidden transform transition-all duration-200 hover:shadow-xl order-1 lg:order-2">
             <div className="px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white">
               <h3 className="text-xl font-bold">
-                <span className="mr-2">➕</span>
+                <FontAwesomeIcon icon={faPlus} className="mr-2" />
                 Add New Expense
               </h3>
             </div>
@@ -261,7 +414,7 @@ const Expenses = () => {
                 <div>
                   <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
                     <span className="flex items-center">
-                      <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>
+                      <FontAwesomeIcon icon={faCircle} className="text-green-500 text-xs mr-2" />
                       Amount
                       {errors.amount && <span className="text-red-500 text-xs ml-1">({errors.amount})</span>}
                     </span>
@@ -286,7 +439,7 @@ const Expenses = () => {
                 <div>
                   <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
                     <span className="flex items-center">
-                      <span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
+                      <FontAwesomeIcon icon={faCircle} className="text-blue-500 text-xs mr-2" />
                       Category
                       {errors.category && <span className="text-red-500 text-xs ml-1">({errors.category})</span>}
                     </span>
@@ -315,7 +468,7 @@ const Expenses = () => {
                 <div>
                   <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
                     <span className="flex items-center">
-                      <span className="inline-block w-3 h-3 rounded-full bg-purple-500 mr-2"></span>
+                      <FontAwesomeIcon icon={faCircle} className="text-purple-500 text-xs mr-2" />
                       Description
                     </span>
                   </label>
@@ -336,15 +489,12 @@ const Expenses = () => {
                 >
                   {loading ? (
                     <span className="flex items-center justify-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
+                      <FontAwesomeIcon icon={faSpinner} className="animate-spin mr-2" />
                       Adding...
                     </span>
                   ) : (
                     <span className="flex items-center justify-center">
-                      <span className="mr-2">+</span>
+                      <FontAwesomeIcon icon={faPlus} className="mr-2" />
                       Add Expense
                     </span>
                   )}

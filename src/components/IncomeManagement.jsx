@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, DollarSign, TrendingUp, BarChart3, Eye, Users, PieChart } from 'lucide-react';
+import { Plus, DollarSign, TrendingUp, BarChart3, Eye, Users, PieChart, Download } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 const IncomeManagement = () => {
@@ -23,6 +23,9 @@ const IncomeManagement = () => {
     const token = localStorage.getItem('access_token');
     const role = localStorage.getItem('user_role') || 'guest';
     setUserRole(role);
+    
+    console.log('Income Management - Token found:', token ? 'Yes' : 'No'); // Debug log
+    console.log('Income Management - User role:', role); // Debug log
   }, []);
 
   // API Base URL
@@ -31,6 +34,11 @@ const IncomeManagement = () => {
   // Helper function to get auth headers
   const getAuthHeaders = () => {
     const token = localStorage.getItem('access_token');
+    
+    if (!token) {
+      throw new Error('No authentication token found. Please login again.');
+    }
+    
     return {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
@@ -43,9 +51,29 @@ const IncomeManagement = () => {
     
     setLoading(true);
     try {
+      const headers = getAuthHeaders();
+      console.log('Fetching income data with headers:', headers); // Debug log
+      
       const response = await fetch(`${API_BASE}/income/all`, {
-        headers: getAuthHeaders()
+        headers
       });
+      
+      console.log('Income data response status:', response.status); // Debug log
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear();
+          throw new Error('Session expired. Please login again.');
+        }
+        if (response.status === 404) {
+          // Endpoint doesn't exist - this is normal, just show empty state
+          setIncomeData([]);
+          setIncomeStats(null);
+          return;
+        }
+        throw new Error(`Failed to fetch income data (${response.status})`);
+      }
+      
       const data = await response.json();
       
       if (data.success) {
@@ -55,7 +83,12 @@ const IncomeManagement = () => {
         setError(data.message || 'Failed to fetch income data');
       }
     } catch (err) {
-      setError('Network error occurred');
+      console.error('Error fetching income data:', err);
+      if (err.message.includes('login')) {
+        setError(err.message);
+      } else {
+        setError('Income data not available');
+      }
     } finally {
       setLoading(false);
     }
@@ -102,20 +135,45 @@ const IncomeManagement = () => {
   const fetchIncomeStats = async () => {
     setLoading(true);
     try {
+      const headers = getAuthHeaders();
+      console.log('Fetching income stats with headers:', headers); // Debug log
+      
       const response = await fetch(`${API_BASE}/income/stats`, {
-        headers: getAuthHeaders()
+        headers
       });
+      
+      console.log('Income stats response status:', response.status); // Debug log
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear();
+          throw new Error('Session expired. Please login again.');
+        }
+        if (response.status === 404) {
+          // Stats endpoint doesn't exist, try to fetch income data instead
+          console.log('Stats endpoint not found, fetching income data instead');
+          fetchIncomeData();
+          return;
+        }
+        throw new Error(`Failed to fetch income stats (${response.status})`);
+      }
+      
       const data = await response.json();
       
       if (data.success) {
         setIncomeStats(data.data);
       } else {
-        // If stats endpoint doesn't exist, calculate from income data
+        // If stats endpoint doesn't work properly, calculate from income data
         fetchIncomeData();
       }
     } catch (err) {
-      // Fallback to fetching income data
-      fetchIncomeData();
+      console.error('Error fetching income stats:', err);
+      if (err.message.includes('login')) {
+        setError(err.message);
+      } else {
+        // Fallback to fetching income data
+        fetchIncomeData();
+      }
     } finally {
       setLoading(false);
     }
@@ -135,15 +193,32 @@ const IncomeManagement = () => {
 
     setLoading(true);
     try {
+      const headers = getAuthHeaders();
+      console.log('Creating income record with headers:', headers); // Debug log
+      
       const response = await fetch(`${API_BASE}/income`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers,
         body: JSON.stringify({
           description: formData.description,
           amount: parseFloat(formData.amount),
           category: formData.category || formData.description.split(' ')[0]
         })
       });
+      
+      console.log('Create income response status:', response.status); // Debug log
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear();
+          throw new Error('Session expired. Please login again.');
+        }
+        if (response.status === 404) {
+          throw new Error('Income creation endpoint not found. This feature may not be implemented yet.');
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to create income record (${response.status})`);
+      }
       
       const data = await response.json();
       
@@ -156,17 +231,63 @@ const IncomeManagement = () => {
         setError(data.message || 'Failed to create income record');
       }
     } catch (err) {
-      setError('Network error occurred');
+      console.error('Error creating income record:', err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
+  // Download functionality
+  const downloadIncomeData = () => {
+    if (incomeData.length === 0) {
+      setError('No income data to download');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    try {
+      // Create CSV content
+      const headers = ['ID', 'Description', 'Category', 'Amount', 'Date Created'];
+      const csvContent = [
+        headers.join(','),
+        ...incomeData.map(record => [
+          record.id,
+          `"${(record.description || '').replace(/"/g, '""')}"`, // Handle quotes in description
+          record.category || 'Uncategorized',
+          record.amount,
+          new Date(record.date_created).toLocaleDateString()
+        ].join(','))
+      ].join('\n');
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `income_records_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setSuccess('Income data downloaded successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Failed to download income data');
+      setTimeout(() => setError(''), 3000);
+    }
+  };
+
   // Load data on component mount and tab change
   useEffect(() => {
-    fetchIncomeStats();
-    if (userRole === 'admin') {
-      fetchIncomeData();
+    if (userRole !== 'guest') {
+      fetchIncomeStats();
+      if (userRole === 'admin') {
+        fetchIncomeData();
+      }
     }
   }, [userRole]);
 
@@ -207,12 +328,26 @@ const IncomeManagement = () => {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-            Income Management Dashboard
-          </h1>
-          <p className="text-gray-600 text-sm md:text-base">
-            {userRole === 'admin' ? 'Manage income and track financial performance' : 'View income overview'}
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div className="mb-4 sm:mb-0">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+                Income Management Dashboard
+              </h1>
+              <p className="text-gray-600 text-sm md:text-base">
+                {userRole === 'admin' ? 'Manage income and track financial performance' : 'View income overview'}
+              </p>
+            </div>
+            
+            {userRole === 'admin' && incomeData.length > 0 && (
+              <button
+                onClick={downloadIncomeData}
+                className="flex items-center px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-medium rounded-md shadow-sm transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download CSV
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Error/Success Messages */}
@@ -376,6 +511,19 @@ const IncomeManagement = () => {
                 </div>
               </div>
             )}
+
+            {/* No Data State */}
+            {!incomeStats && !loading && (
+              <div className="text-center py-12">
+                <DollarSign className="mx-auto w-16 h-16 text-gray-400 mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Income Data Available</h3>
+                <p className="text-gray-600">
+                  {userRole === 'admin' 
+                    ? 'Start by adding your first income record or check if the income endpoints are properly configured.' 
+                    : 'Income data is not available at this time.'}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -443,9 +591,21 @@ const IncomeManagement = () => {
         {/* Income Records Tab (Admin Only) */}
         {activeTab === 'records' && userRole === 'admin' && (
           <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900">Income Records</h2>
-              <p className="text-gray-600 mt-1">All income entries in the system</p>
+            <div className="p-6 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+              <div className="mb-4 sm:mb-0">
+                <h2 className="text-2xl font-bold text-gray-900">Income Records</h2>
+                <p className="text-gray-600 mt-1">All income entries in the system</p>
+              </div>
+              
+              {incomeData.length > 0 && (
+                <button
+                  onClick={downloadIncomeData}
+                  className="flex items-center px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-medium rounded-md shadow-sm transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download CSV
+                </button>
+              )}
             </div>
             
             <div className="overflow-x-auto">

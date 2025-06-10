@@ -10,13 +10,22 @@ import {
   faBars, 
   faChevronRight,
   faChevronLeft,
-  faDollarSign
+  faDollarSign,
+  faTachometerAlt,
+  faCreditCard,
+  faMapMarkedAlt,
+  faFileInvoiceDollar,
+  faChartPie,
+  faUserShield,
+  faAngleDoubleRight,
+  faAngleDoubleLeft
 } from '@fortawesome/free-solid-svg-icons'
 
 const Sidebar = ({ role }) => {
   const [expanded, setExpanded] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
   const [hoverTimeout, setHoverTimeout] = useState(null)
+  const [isHovering, setIsHovering] = useState(false)
   const sidebarRef = useRef(null)
   
   useEffect(() => {
@@ -47,6 +56,7 @@ const Sidebar = ({ role }) => {
   const handleMouseEnter = () => {
     if (isMobile) return
     
+    setIsHovering(true)
     if (hoverTimeout) clearTimeout(hoverTimeout)
     
     if (!expanded) {
@@ -57,6 +67,7 @@ const Sidebar = ({ role }) => {
   const handleMouseLeave = () => {
     if (isMobile) return
     
+    setIsHovering(false)
     if (hoverTimeout) clearTimeout(hoverTimeout)
     
     const timeout = setTimeout(() => {
@@ -67,14 +78,15 @@ const Sidebar = ({ role }) => {
   }
 
   const menuItems = [
-    { name: 'Dashboard', path: '/', icon: faChartLine, exact: true },
-    { name: 'Expenses', path: '/expenses', icon: faReceipt },
-    { name: 'Travel', path: '/travel', icon: faRoute },
-    { name: 'Daily Reports', path: '/reports', icon: faClipboardList },
-    { name: 'Income & Profit', path: '/income', icon: faDollarSign }
+    { name: 'Dashboard', path: '/', icon: faTachometerAlt, exact: true, color: 'from-blue-600 to-indigo-600' },
+    { name: 'Expenses', path: '/expenses', icon: faCreditCard, color: 'from-red-600 to-pink-600' },
+    { name: 'Travel', path: '/travel', icon: faMapMarkedAlt, color: 'from-green-600 to-emerald-600' },
+    { name: 'Daily Reports', path: '/reports', icon: faFileInvoiceDollar, color: 'from-orange-600 to-amber-600' },
+    // Income & Profit tab is now conditionally included based on role
+    ...(role === 'admin' ? [{ name: 'Income & Profit', path: '/income', icon: faChartPie, color: 'from-emerald-600 to-green-600' }] : [])
   ]
 
-  const adminMenuItem = { name: 'Admin Panel', path: '/admin', icon: faUserCog }
+  const adminMenuItem = { name: 'Admin Panel', path: '/admin', icon: faUserShield, color: 'from-purple-600 to-violet-600' }
 
   return (
     <>
@@ -91,154 +103,166 @@ const Sidebar = ({ role }) => {
         ref={sidebarRef}
         className={`
           fixed top-0 left-0 h-screen z-40
-          transition-all duration-300 ease-in-out
+          transition-all duration-500 ease-out
           ${expanded ? 'w-72' : 'w-20'}
           ${isMobile && !expanded ? '-translate-x-full' : 'translate-x-0'}
           md:relative md:translate-x-0
-          bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 
-          text-white shadow-xl
+          bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900 
+          text-white shadow-2xl border-r border-indigo-700/50
+          ${isHovering ? 'scale-[1.02] shadow-3xl ring-2 ring-cyan-400/30' : 'scale-100'}
+          before:absolute before:inset-0 before:bg-gradient-to-r before:from-cyan-500/10 before:to-purple-500/10 
+          before:opacity-0 before:transition-opacity before:duration-500
+          ${isHovering ? 'before:opacity-100' : ''}
+          overflow-hidden
         `}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        {/* Header section */}
-        <div className="p-4 flex items-center space-x-3 border-b border-indigo-700 relative">
-          <div className="w-12 h-12 bg-gradient-to-tr from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg ring-2 ring-purple-400 ring-opacity-30">
-            <span className="font-bold text-white text-lg">TE</span>
+        {/* Animated background particles */}
+        <div className={`absolute inset-0 transition-opacity duration-500 ${isHovering ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-cyan-400 rounded-full animate-ping"></div>
+          <div className="absolute top-3/4 right-1/4 w-1 h-1 bg-purple-400 rounded-full animate-pulse"></div>
+          <div className="absolute top-1/2 left-1/3 w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
+        </div>
+
+        {/* Sliding edge indicator */}
+        <div className={`absolute top-0 right-0 w-1 h-full transition-all duration-500 ${isHovering ? 'bg-gradient-to-b from-cyan-400 to-purple-400 opacity-100' : 'opacity-0'}`}></div>
+
+        {/* Header section without logo */}
+        <div className="p-4 flex items-center justify-between border-b border-indigo-700/50 relative bg-gradient-to-r from-indigo-800/50 to-purple-800/50">
+          <div className={`transition-all duration-500 ${expanded ? 'opacity-100 visible transform translate-x-0' : 'opacity-0 invisible md:hidden transform -translate-x-4'}`}>
+            <span className={`font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-purple-200 block leading-tight transition-all duration-500 ${isHovering ? 'animate-pulse' : ''}`}>
+              TrackExpense
+            </span>
+            <span className="text-xs text-indigo-300 font-medium">
+              Amey Distribution
+            </span>
           </div>
-          <span className={`font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-purple-200 transition-opacity duration-300 
-            ${expanded ? 'opacity-100 visible' : 'opacity-0 invisible md:hidden'}
-          `}>
-            TrackExpense
-          </span>
           
           <button 
             onClick={toggleSidebar}
             className={`
-              absolute right-3 top-1/2 transform -translate-y-1/2 
-              text-indigo-300 hover:text-white transition-colors duration-200 
-              focus:outline-none
+              text-indigo-300 hover:text-white transition-all duration-300 
+              focus:outline-none hover:bg-indigo-700/50 rounded-full p-2
               ${isMobile ? 'md:hidden' : ''}
+              transform hover:rotate-180 hover:scale-110
             `}
             aria-label="Toggle sidebar"
           >
-            <FontAwesomeIcon icon={expanded ? faChevronLeft : faChevronRight} className="text-sm" />
+            <FontAwesomeIcon icon={expanded ? faAngleDoubleLeft : faAngleDoubleRight} className="text-sm" />
           </button>
         </div>
 
         {/* Navigation section */}
         <nav className={`
-          mt-6 px-2
+          mt-6 px-3 space-y-2
           ${isMobile && !expanded ? 'invisible' : 'visible'}
         `}>
-          {menuItems.map((item) => (
+          {menuItems.map((item, index) => (
             <NavLink
               key={item.path}
               to={item.path}
               end={item.exact}
               className={({ isActive }) => `
-                flex items-center px-4 py-4 my-2 rounded-xl
+                flex items-center px-4 py-3 rounded-xl
                 ${isActive 
-                  ? item.name === 'Income & Profit'
-                    ? 'bg-gradient-to-r from-green-600 via-emerald-500 to-green-600 text-white shadow-md'
-                    : 'bg-gradient-to-r from-blue-600 via-purple-500 to-indigo-600 text-white shadow-md'
-                  : 'hover:bg-indigo-800/50 text-gray-200'} 
-                transition-all duration-200 relative overflow-hidden group
+                  ? `bg-gradient-to-r ${item.color} text-white shadow-lg ring-2 ring-white/20 animate-pulse`
+                  : 'hover:bg-indigo-800/50 text-gray-200 hover:text-white'} 
+                transition-all duration-500 relative overflow-hidden group
+                hover:scale-110 hover:shadow-2xl hover:ring-2 hover:ring-cyan-400/30
+                transform hover:-translate-y-1
+                ${expanded ? `animate-[slideIn_0.5s_ease-out_${index * 0.1}s_both]` : ''}
               `}
+              style={{
+                animationDelay: expanded ? `${index * 0.1}s` : '0s'
+              }}
             >
-              <div className="min-w-[32px] flex justify-center">
+              {/* Glowing background effect */}
+              <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-500 bg-gradient-to-r ${item.color}/30 blur-xl transform scale-150`} />
+              
+              {/* Icon with enhanced animations */}
+              <div className="min-w-[32px] flex justify-center relative z-10">
                 <FontAwesomeIcon 
                   icon={item.icon} 
-                  className={`text-lg transition-all duration-300 group-hover:scale-110 ${expanded ? '' : 'text-xl'} ${
-                    item.name === 'Income & Profit' ? 'text-green-300' : ''
-                  }`}
+                  className={`text-lg transition-all duration-500 
+                    group-hover:rotate-[360deg] group-hover:scale-125 
+                    ${expanded ? '' : 'text-xl'}
+                    ${isHovering ? 'drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]' : ''}
+                  `}
                 />
               </div>
-              <span className={`transition-all duration-300 font-medium 
-                ${expanded ? 'ml-3 opacity-100' : 'opacity-0 translate-x-8 absolute'}
+              
+              {/* Text with staggered animation */}
+              <span className={`transition-all duration-500 font-medium relative z-10
+                ${expanded ? 'ml-3 opacity-100 transform translate-x-0' : 'opacity-0 translate-x-8 absolute'}
+                group-hover:text-shadow-lg
               `}>
                 {item.name}
               </span>
               
-              <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none ${
-                item.name === 'Income & Profit' 
-                  ? 'bg-gradient-to-r from-green-500/10 to-emerald-500/10'
-                  : 'bg-gradient-to-r from-blue-500/10 to-purple-500/10'
-              }`} />
-              <span className={`absolute bottom-0 left-0 w-full h-0.5 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ${
-                item.name === 'Income & Profit'
-                  ? 'bg-gradient-to-r from-green-400 to-emerald-400'
-                  : 'bg-gradient-to-r from-blue-400 to-purple-400'
-              }`} />
+              {/* Sliding border effect */}
+              <div className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r ${item.color} w-0 group-hover:w-full transition-all duration-500`} />
+              
+              {/* Floating arrow */}
+              <span className={`absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-500 text-sm
+                animate-bounce group-hover:translate-x-1`}>
+                →
+              </span>
+              
+              {/* Ripple effect */}
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="absolute top-1/2 left-1/2 w-0 h-0 rounded-full bg-white/20 group-hover:w-full group-hover:h-full group-hover:-translate-x-1/2 group-hover:-translate-y-1/2 transition-all duration-500"></div>
+              </div>
             </NavLink>
           ))}
-          
-          {role === 'admin' && (
-            <div className="my-4 border-t border-indigo-700/50 pt-4">
-              <div className={`px-4 text-xs uppercase text-indigo-300 font-semibold mb-2 transition-opacity duration-300 
-                ${expanded ? 'opacity-100' : 'opacity-0'}
-              `}>
-                Administration
-              </div>
-              
-              <NavLink
-                to="/admin"
-                className={({ isActive }) => `
-                  flex items-center px-4 py-4 my-2 rounded-xl
-                  ${isActive 
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-md' 
-                    : 'hover:bg-indigo-800/50 text-gray-200'} 
-                  transition-all duration-200 relative overflow-hidden group
-                `}
-              >
-                <div className="min-w-[32px] flex justify-center">
-                  <FontAwesomeIcon 
-                    icon={adminMenuItem.icon} 
-                    className={`text-lg transition-all duration-300 group-hover:scale-110 ${expanded ? '' : 'text-xl'}`}
-                  />
-                </div>
-                <span className={`transition-all duration-300 font-medium 
-                  ${expanded ? 'ml-3 opacity-100' : 'opacity-0 translate-x-8 absolute'}
-                `}>
-                  {adminMenuItem.name}
-                </span>
-                
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-purple-400 to-pink-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
-              </NavLink>
-            </div>
-          )}
         </nav>
 
-        {/* Bottom toggle buttons */}
-        <div className="absolute bottom-8 left-0 right-0 flex justify-center px-4">
-          {isMobile && (
-            <button 
-              onClick={toggleSidebar}
-              className={`
-                p-3 rounded-full 
-                bg-gradient-to-r from-blue-600 to-purple-600 
-                text-white shadow-lg 
-                hover:from-blue-700 hover:to-purple-700 
-                transition-colors duration-200 
-                focus:outline-none
-                ${expanded ? 'opacity-0' : 'opacity-100'}
-              `}
-              aria-label="Toggle sidebar"
-            >
-              <FontAwesomeIcon icon={faBars} />
-            </button>
-          )}
-          
-          {!isMobile && !expanded && (
-            <button 
-              onClick={toggleSidebar}
-              className="p-3 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg hover:from-blue-700 hover:to-purple-700 transition-colors duration-200 focus:outline-none"
-              aria-label="Expand sidebar"
-            >
-              <FontAwesomeIcon icon={faChevronRight} />
-            </button>
-          )}
+        {/* Footer section */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-900/80 to-transparent">
+          <div className={`text-center text-xs text-indigo-300 transition-all duration-500 mb-4
+            ${expanded ? 'opacity-100 transform translate-y-0' : 'opacity-0 transform translate-y-4'}
+          `}>
+            <div className="flex items-center justify-center space-x-1 mb-1">
+              <span className={`w-2 h-2 bg-green-400 rounded-full transition-all duration-300 ${isHovering ? 'animate-ping scale-150' : 'animate-pulse'}`}></span>
+              <span className={`transition-all duration-300 ${isHovering ? 'text-green-300' : ''}`}>System Online</span>
+            </div>
+            <span className={`transition-all duration-300 ${isHovering ? 'text-cyan-300' : ''}`}>v2.1.0</span>
+          </div>
+
+          {/* Bottom toggle buttons */}
+          <div className="flex justify-center">
+            {isMobile && (
+              <button 
+                onClick={toggleSidebar}
+                className={`
+                  p-3 rounded-full 
+                  bg-gradient-to-r from-blue-600 to-purple-600 
+                  text-white shadow-lg 
+                  hover:from-blue-700 hover:to-purple-700 
+                  transition-all duration-300 
+                  focus:outline-none transform hover:scale-110 hover:rotate-12
+                  ${expanded ? 'opacity-0' : 'opacity-100'}
+                  hover:shadow-2xl hover:ring-4 hover:ring-blue-400/30
+                `}
+                aria-label="Toggle sidebar"
+              >
+                <FontAwesomeIcon icon={faBars} />
+              </button>
+            )}
+            
+            {!isMobile && !expanded && (
+              <button 
+                onClick={toggleSidebar}
+                className="p-3 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg 
+                  hover:from-blue-700 hover:to-purple-700 transition-all duration-300 focus:outline-none 
+                  transform hover:scale-110 hover:rotate-12 hover:shadow-2xl hover:ring-4 hover:ring-blue-400/30
+                  animate-pulse"
+                aria-label="Expand sidebar"
+              >
+                <FontAwesomeIcon icon={faAngleDoubleRight} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -247,17 +271,37 @@ const Sidebar = ({ role }) => {
         <button 
           onClick={toggleSidebar}
           className="fixed bottom-8 left-4 z-50 
-            p-3 rounded-full 
+            p-4 rounded-full 
             bg-gradient-to-r from-blue-600 to-purple-600 
-            text-white shadow-lg 
+            text-white shadow-xl 
             hover:from-blue-700 hover:to-purple-700 
-            transition-colors duration-200 
-            focus:outline-none"
+            transition-all duration-300 
+            focus:outline-none transform hover:scale-110 hover:rotate-12
+            ring-4 ring-blue-600/20 hover:ring-cyan-400/40
+            animate-bounce hover:animate-none"
           aria-label="Open sidebar"
         >
-          <FontAwesomeIcon icon={faBars} />
+          <FontAwesomeIcon icon={faBars} className="text-lg" />
         </button>
       )}
+
+      {/* Custom CSS animations */}
+      <style jsx>{`
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateX(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        
+        .animate-slideIn {
+          animation: slideIn 0.5s ease-out forwards;
+        }
+      `}</style>
     </>
   )
 }
