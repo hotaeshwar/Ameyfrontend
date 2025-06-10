@@ -10,6 +10,7 @@ const IncomeManagement = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [userRole, setUserRole] = useState('guest');
+  const [availableCategories, setAvailableCategories] = useState([]);
   
   // Form states
   const [formData, setFormData] = useState({
@@ -43,6 +44,30 @@ const IncomeManagement = () => {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     };
+  };
+
+  // Fetch available income categories
+  const fetchIncomeCategories = async () => {
+    try {
+      const headers = getAuthHeaders();
+      const response = await fetch(`${API_BASE}/categories/income`, {
+        headers
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setAvailableCategories(data.data);
+        }
+      } else {
+        // Fallback to default categories if endpoint doesn't exist
+        setAvailableCategories(['Dealer Payment', 'Distributor Payment', 'Advance', 'Other']);
+      }
+    } catch (err) {
+      console.log('Categories endpoint not available, using defaults');
+      // Fallback to default categories
+      setAvailableCategories(['Dealer Payment', 'Distributor Payment', 'Advance', 'Other']);
+    }
   };
 
   // Fetch all income records
@@ -104,9 +129,9 @@ const IncomeManagement = () => {
     const totalIncome = data.reduce((sum, record) => sum + record.amount, 0);
     const averageIncome = totalIncome / data.length;
     
-    // Group income by category for pie chart
+    // Group income by category for pie chart - Updated to use proper category field
     const incomeByCategory = data.reduce((acc, record) => {
-      const category = record.category || record.description.split(' ')[0] || 'Other';
+      const category = record.category || 'Other';
       acc[category] = (acc[category] || 0) + record.amount;
       return acc;
     }, {});
@@ -179,15 +204,15 @@ const IncomeManagement = () => {
     }
   };
 
-  // Create new income record
+  // Create new income record - Updated to use category properly
   const createIncomeRecord = async () => {
     if (userRole !== 'admin') {
       setError('Only admins can create income records');
       return;
     }
 
-    if (!formData.description || !formData.amount) {
-      setError('Please fill in all required fields');
+    if (!formData.description || !formData.amount || !formData.category) {
+      setError('Please fill in all required fields including category');
       return;
     }
 
@@ -202,7 +227,7 @@ const IncomeManagement = () => {
         body: JSON.stringify({
           description: formData.description,
           amount: parseFloat(formData.amount),
-          category: formData.category || formData.description.split(' ')[0]
+          category: formData.category
         })
       });
       
@@ -238,7 +263,7 @@ const IncomeManagement = () => {
     }
   };
 
-  // Download functionality
+  // Download functionality - Updated to include category column
   const downloadIncomeData = () => {
     if (incomeData.length === 0) {
       setError('No income data to download');
@@ -254,7 +279,7 @@ const IncomeManagement = () => {
         ...incomeData.map(record => [
           record.id,
           `"${(record.description || '').replace(/"/g, '""')}"`, // Handle quotes in description
-          record.category || 'Uncategorized',
+          record.category || 'Other',
           record.amount,
           new Date(record.date_created).toLocaleDateString()
         ].join(','))
@@ -284,6 +309,7 @@ const IncomeManagement = () => {
   // Load data on component mount and tab change
   useEffect(() => {
     if (userRole !== 'guest') {
+      fetchIncomeCategories(); // Fetch available categories
       fetchIncomeStats();
       if (userRole === 'admin') {
         fetchIncomeData();
@@ -502,6 +528,9 @@ const IncomeManagement = () => {
                       <div>
                         <span className="font-medium text-gray-700">{record.description}</span>
                         <span className="text-sm text-gray-500 ml-2">
+                          ({record.category || 'Other'})
+                        </span>
+                        <span className="text-sm text-gray-500 ml-2">
                           {record.date_created ? formatDate(record.date_created) : 'Recent'}
                         </span>
                       </div>
@@ -527,7 +556,7 @@ const IncomeManagement = () => {
           </div>
         )}
 
-        {/* Create Income Tab (Admin Only) */}
+        {/* Create Income Tab (Admin Only) - Updated with category dropdown */}
         {activeTab === 'create' && userRole === 'admin' && (
           <div className="max-w-2xl mx-auto">
             <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg">
@@ -549,15 +578,20 @@ const IncomeManagement = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Category
+                    Category *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.category}
                     onChange={(e) => setFormData({...formData, category: e.target.value})}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                    placeholder="Enter income category (optional)"
-                  />
+                  >
+                    <option value="">Select a category</option>
+                    {availableCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -576,7 +610,7 @@ const IncomeManagement = () => {
 
                 <button
                   onClick={createIncomeRecord}
-                  disabled={loading || !formData.description || !formData.amount}
+                  disabled={loading || !formData.description || !formData.amount || !formData.category}
                   className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-6 rounded-lg font-medium 
                            hover:from-blue-600 hover:to-indigo-700 transform hover:scale-105 transition-all duration-300 
                            disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
@@ -629,7 +663,9 @@ const IncomeManagement = () => {
                         {record.description}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
-                        {record.category || 'Uncategorized'}
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {record.category || 'Other'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
                         {formatCurrency(record.amount)}
