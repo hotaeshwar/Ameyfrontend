@@ -36,7 +36,7 @@ const Expenses = () => {
       setError('')
       const token = localStorage.getItem('access_token')
       
-      const response = await fetch('http://localhost:8000/expenses/my', {
+      const response = await fetch('https://api.ameyaaccountsonline.info/expenses/my', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -82,7 +82,7 @@ const Expenses = () => {
       setError('')
       const token = localStorage.getItem('access_token')
       
-      const response = await fetch('http://localhost:8000/expenses', {
+      const response = await fetch('https://api.ameyaaccountsonline.info/expenses', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
