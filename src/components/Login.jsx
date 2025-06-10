@@ -200,11 +200,11 @@ const LoginPage = ({ onLogin }) => {
           
           {/* Logo and Header Inside Card */}
           <div className="text-center mb-8">
-            <div className="mx-auto w-32 h-32 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full shadow-lg flex items-center justify-center mb-6 transform hover:scale-110 transition-transform duration-300 border-2 border-blue-100">
+            <div className="mx-auto w-40 h-40 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full shadow-lg flex items-center justify-center mb-6 transform hover:scale-110 transition-transform duration-300 border-2 border-blue-100">
               <img 
                 src={logo} 
                 alt="Amey Distribution Logo" 
-                className="w-28 h-28 object-contain"
+                className="w-36 h-36 object-contain"
               />
             </div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2 tracking-wide">Welcome Back</h1>
