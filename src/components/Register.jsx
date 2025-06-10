@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import logo from '../assets/images/AMEY-DISTRIBUTION.png';
 
 // API Base URL Configuration
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://api.ameyaaccountsonline.info';
 
 const RegistrationPage = ({ onRegister }) => {
   const navigate = useNavigate();
